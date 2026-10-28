@@ -1,0 +1,196 @@
+:root {
+  color-scheme: light dark;
+  font-family:
+    system-ui,
+    -apple-system,
+    'Noto Sans TC',
+    'PingFang TC',
+    'Microsoft JhengHei',
+    sans-serif;
+  line-height: 1.5;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+main {
+  max-width: 40rem;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+h1 {
+  font-size: 1.5rem;
+  margin: 0 0 1rem;
+}
+
+h2 {
+  font-size: 1.125rem;
+  margin: 0 0 0.75rem;
+}
+
+section {
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  border: 1px solid color-mix(in srgb, currentColor 20%, transparent);
+  border-radius: 0.5rem;
+}
+
+label {
+  display: block;
+  margin-bottom: 0.75rem;
+  font-size: 0.875rem;
+}
+
+input,
+textarea,
+select,
+button {
+  font: inherit;
+}
+
+input:not([type='file']),
+textarea,
+select {
+  display: block;
+  width: 100%;
+  margin-top: 0.25rem;
+  padding: 0.5rem;
+}
+
+button {
+  padding: 0.5rem 0.75rem;
+  cursor: pointer;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: flex-end;
+}
+
+.row > label {
+  flex: 1 1 8rem;
+}
+
+.history {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.history li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid color-mix(in srgb, currentColor 15%, transparent);
+}
+
+.status {
+  margin: 0.5rem 0 0;
+  font-size: 0.875rem;
+}
+
+/* 趨勢圖：系列色取自類別色票的槽 1（體重）與槽 2（睡眠），深色模式用同色票的深色階 */
+:root {
+  --series-weight: #2a78d6;
+  --series-sleep: #eb6834;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --series-weight: #3987e5;
+    --series-sleep: #d95926;
+  }
+}
+
+.trend {
+  margin: 0 0 1.25rem;
+}
+
+.trend h3 {
+  font-size: 1rem;
+  margin: 0 0 0.25rem;
+}
+
+.trend p {
+  margin: 0;
+  font-size: 0.875rem;
+}
+
+.trend svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin-top: 0.5rem;
+}
+
+.trend-grid {
+  stroke: currentColor;
+  stroke-opacity: 0.15;
+  stroke-width: 1;
+}
+
+/* 文字一律用內文顏色，不用系列色；身分由旁邊的線與點表示 */
+.trend-axis {
+  fill: currentColor;
+  fill-opacity: 0.65;
+  font-size: 10px;
+}
+
+.series-weight {
+  --series: var(--series-weight);
+}
+
+.series-sleep {
+  --series: var(--series-sleep);
+}
+
+.trend-line {
+  fill: none;
+  stroke: var(--series);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* 圓點外圈 2px 與頁面底色相同，與線或其他點重疊時仍看得清楚 */
+.trend-dot {
+  fill: var(--series);
+  stroke: Canvas;
+  stroke-width: 2;
+}
+
+.trend-hit {
+  fill: transparent;
+}
+
+.trend details {
+  margin-top: 0.5rem;
+  font-size: 0.875rem;
+}
+
+.trend table {
+  width: 100%;
+  margin-top: 0.5rem;
+  border-collapse: collapse;
+}
+
+.trend th,
+.trend td {
+  padding: 0.25rem 0.5rem;
+  text-align: left;
+  border-bottom: 1px solid color-mix(in srgb, currentColor 15%, transparent);
+  font-variant-numeric: tabular-nums;
+}
+
+.trend-segment {
+  white-space: nowrap;
+}

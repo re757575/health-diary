@@ -1,0 +1,6 @@
+# commit 前依序執行：格式化／lint（只處理暫存檔）→ 型別檢查 → 單元測試 → E2E
+# 任何一步失敗就中止 commit，先修好再 commit
+npx lint-staged
+npm run typecheck
+npm test
+npm run e2e
