@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { entrySchema, sleepHours } from './entry'
+import {
+  BRISTOL_DESCRIPTIONS,
+  MOOD_DESCRIPTIONS,
+  SLEEP_QUALITY_DESCRIPTIONS,
+  entrySchema,
+  sleepHours,
+} from './entry'
 
 describe('sleepHours', () => {
   it('跨午夜時加一天計算', () => {
@@ -13,6 +19,14 @@ describe('sleepHours', () => {
   it('缺少任一時間回傳 undefined', () => {
     expect(sleepHours({ bedtime: '23:00' })).toBeUndefined()
     expect(sleepHours(undefined)).toBeUndefined()
+  })
+})
+
+describe('評分說明', () => {
+  it('每個分數都有說明：睡眠品質與心情 1–5，布里斯托 1–7', () => {
+    expect(SLEEP_QUALITY_DESCRIPTIONS).toHaveLength(5)
+    expect(MOOD_DESCRIPTIONS).toHaveLength(5)
+    expect(BRISTOL_DESCRIPTIONS).toHaveLength(7)
   })
 })
 

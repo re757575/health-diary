@@ -10,8 +10,17 @@ import {
 } from '@mantine/core'
 import { useState, type FormEvent } from 'react'
 import { saveEntry } from '@/data/repository'
-import { MEAL_LABELS, MEAL_TYPES, entrySchema, type MealType } from '@/domain/entry'
+import {
+  BRISTOL_DESCRIPTIONS,
+  MEAL_LABELS,
+  MEAL_TYPES,
+  MOOD_DESCRIPTIONS,
+  SLEEP_QUALITY_DESCRIPTIONS,
+  entrySchema,
+  type MealType,
+} from '@/domain/entry'
 import { formToEntry, shiftDate, type BowelFormValues, type FormValues } from '@/domain/form'
+import { RatingPicker } from './RatingPicker'
 import { Status } from './Status'
 import { useStatus } from './useStatus'
 
@@ -136,16 +145,15 @@ export function EntryForm({ initial, onDateChange }: Props) {
             value={form.wakeTime}
             onChange={(e) => set('wakeTime', e.target.value)}
           />
-          <TextInput
-            label="睡眠品質（1–5）"
-            type="number"
-            inputMode="numeric"
-            min="1"
-            max="5"
-            value={form.sleepQuality}
-            onChange={(e) => set('sleepQuality', e.target.value)}
-          />
         </div>
+        <RatingPicker
+          label="睡眠品質（1–5）"
+          descriptions={SLEEP_QUALITY_DESCRIPTIONS}
+          value={form.sleepQuality}
+          onChange={(v) => set('sleepQuality', v)}
+          lowLabel="差"
+          highLabel="好"
+        />
 
         <Divider
           label="飲食"
@@ -172,45 +180,45 @@ export function EntryForm({ initial, onDateChange }: Props) {
         />
         {form.bowel.map((b, i) => (
           <Paper withBorder p="sm" key={i} bg="var(--mantine-color-default-hover)">
-            <div className="fields">
-              <TextInput
-                label="時間"
-                type="time"
-                value={b.time}
-                onChange={(e) => setBowel(i, { time: e.target.value })}
-              />
-              <TextInput
+            <Stack gap="sm">
+              <div className="fields">
+                <TextInput
+                  label="時間"
+                  type="time"
+                  value={b.time}
+                  onChange={(e) => setBowel(i, { time: e.target.value })}
+                />
+              </div>
+              <RatingPicker
                 label="布里斯托（1–7）"
-                type="number"
-                inputMode="numeric"
-                min="1"
-                max="7"
+                descriptions={BRISTOL_DESCRIPTIONS}
                 value={b.bristol}
-                onChange={(e) => setBowel(i, { bristol: e.target.value })}
+                onChange={(v) => setBowel(i, { bristol: v })}
+                lowLabel="硬塊"
+                highLabel="水狀"
               />
-            </div>
-            <TextInput
-              mt="sm"
-              label="備註"
-              value={b.note}
-              onChange={(e) => setBowel(i, { note: e.target.value })}
-            />
-            <Button
-              type="button"
-              variant="subtle"
-              color="red"
-              size="compact-sm"
-              mt="xs"
-              aria-label={`移除第 ${i + 1} 次排便`}
-              onClick={() =>
-                set(
-                  'bowel',
-                  form.bowel.filter((_, j) => j !== i),
-                )
-              }
-            >
-              移除
-            </Button>
+              <TextInput
+                label="備註"
+                value={b.note}
+                onChange={(e) => setBowel(i, { note: e.target.value })}
+              />
+              <Button
+                type="button"
+                variant="subtle"
+                color="red"
+                size="compact-sm"
+                style={{ alignSelf: 'flex-start' }}
+                aria-label={`移除第 ${i + 1} 次排便`}
+                onClick={() =>
+                  set(
+                    'bowel',
+                    form.bowel.filter((_, j) => j !== i),
+                  )
+                }
+              >
+                移除
+              </Button>
+            </Stack>
           </Paper>
         ))}
         <Button
@@ -227,14 +235,13 @@ export function EntryForm({ initial, onDateChange }: Props) {
           mt="xs"
           classNames={{ label: 'section-label' }}
         />
-        <TextInput
+        <RatingPicker
           label="心情／精神（1–5）"
-          type="number"
-          inputMode="numeric"
-          min="1"
-          max="5"
+          descriptions={MOOD_DESCRIPTIONS}
           value={form.mood}
-          onChange={(e) => set('mood', e.target.value)}
+          onChange={(v) => set('mood', v)}
+          lowLabel="低落"
+          highLabel="良好"
         />
         <Textarea
           label="症狀"
