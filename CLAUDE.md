@@ -31,3 +31,4 @@ UI 庫是 Mantine（`@mantine/core`），`MantineProvider` 在 `src/Providers.ts
 
 - GitHub Pages 的 base path 是 `/health-diary/`（`vite.config.ts` 的 `BASE`、`playwright.config.ts` 的 `BASE_PATH`），E2E 的 `page.goto` 用相對路徑（`'./'`），不要以 `/` 開頭。
 - 介面文字一律繁體中文。
+- 要看實際畫面時，用 `npm run preview:fresh`（先 build 再在 4199 起 preview，網址 `http://localhost:4199/health-diary/`）。它會一直跑在前景，背景執行並在看完後 `pkill -f 'preview --port 4199'`。
