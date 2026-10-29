@@ -2,6 +2,11 @@
 
 本檔案由 [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) 依照 [Conventional Commits](https://www.conventionalcommits.org/) 規範的 commit 訊息自動產生，請勿手動編輯內容，執行 `npm run release` 即可更新。
 
+## [0.1.1](https://github.com/re757575/health-diary/compare/v0.1.0...v0.1.1) (2026-10-29)
+
+### Build System
+
+* 升級到 Node.js 24，並更新部署用的 GitHub Actions ([26a6511](https://github.com/re757575/health-diary/commit/26a651160a366ddf9d7c1d2d8e9ead38b206e53e))
 ## 0.1.0 (2026-10-29)
 
 ### Features
