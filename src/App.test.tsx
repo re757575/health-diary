@@ -1,10 +1,11 @@
-import { screen, within } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import { render } from '@/test/render'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { db } from '@/data/db'
 import { getProfile } from '@/data/repository'
 import { serializeBackup } from '@/domain/backup'
+import { shiftDate, toDateString } from '@/domain/form'
 import App from './App'
 
 beforeEach(async () => {
@@ -59,6 +60,39 @@ describe('App', () => {
 
     expect(await screen.findByText(/匯入失敗/)).toBeInTheDocument()
     expect(await db.entries.count()).toBe(0)
+  })
+})
+
+describe('切換日期', () => {
+  it('用前一天、後一天切換日期時，載入的是那一天的紀錄，不是上一天的', async () => {
+    const user = userEvent.setup()
+    const today = toDateString(new Date())
+    const yesterday = shiftDate(today, -1)
+    await db.entries.bulkPut([
+      { date: today, weightKg: 70, meals: [], bowel: [] },
+      { date: yesterday, weightKg: 65, meals: [], bowel: [] },
+    ])
+    render(<App />)
+    expect(await screen.findByLabelText('體重（kg）')).toHaveValue(70)
+
+    await user.click(screen.getByRole('button', { name: '前一天' }))
+    await waitFor(() => expect(screen.getByLabelText('日期')).toHaveValue(yesterday))
+    expect(screen.getByLabelText('體重（kg）')).toHaveValue(65)
+
+    await user.click(screen.getByRole('button', { name: '後一天' }))
+    await waitFor(() => expect(screen.getByLabelText('日期')).toHaveValue(today))
+    expect(screen.getByLabelText('體重（kg）')).toHaveValue(70)
+  })
+
+  it('在歷史紀錄按「編輯」會載入那一天的紀錄，不是空表單', async () => {
+    const user = userEvent.setup()
+    await db.entries.put({ date: '2026-01-02', weightKg: 65, meals: [], bowel: [] })
+    render(<App />)
+
+    await user.click(await screen.findByRole('button', { name: '編輯 2026-01-02' }))
+
+    await waitFor(() => expect(screen.getByLabelText('日期')).toHaveValue('2026-01-02'))
+    expect(screen.getByLabelText('體重（kg）')).toHaveValue(65)
   })
 })
 

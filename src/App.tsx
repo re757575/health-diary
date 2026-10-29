@@ -14,8 +14,10 @@ import { TrendCharts } from './TrendCharts'
 
 export default function App() {
   const [date, setDate] = useState(() => toDateString(new Date()))
-  // 包一層物件以區分「載入中」（undefined）與「這天沒有紀錄」（{ entry: undefined }）
-  const loaded = useLiveQuery(async () => ({ entry: await getEntry(date) }), [date])
+  // 包一層物件以區分「載入中」（undefined）與「這天沒有紀錄」（{ entry: undefined }）。
+  // useLiveQuery 在 date 改變後，新結果回來前會先給上一次的結果，所以結果要帶著日期，
+  // 對不上目前的 date 就當作還在載入；否則表單會用上一天的資料初始化，之後也不會更新
+  const loaded = useLiveQuery(async () => ({ date, entry: await getEntry(date) }), [date])
   const history = useLiveQuery(listEntries, [])
   // 同樣包一層物件區分「載入中」與「尚未填寫」
   const profile = useLiveQuery(async () => ({ value: await getProfile() }), [])
@@ -34,7 +36,7 @@ export default function App() {
         </Title>
 
         <Section title="每日紀錄">
-          {loaded && (
+          {loaded?.date === date && (
             <EntryForm
               key={date}
               initial={loaded.entry ? entryToForm(loaded.entry) : emptyForm(date)}
