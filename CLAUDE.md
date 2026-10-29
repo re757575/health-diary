@@ -21,6 +21,7 @@ UI 庫是 Mantine（`@mantine/core`），`MantineProvider` 在 `src/Providers.ts
 - 日期、時間、數字欄位用 `TextInput type=...`、下拉用 `NativeSelect`，保留原生控制項（手機體驗與測試的 `selectOption` 都依賴它）。
 - 區塊用 `Section`（有標題的卡片，標題即 region 名稱）。
 - 單元測試要從 `@/test/render` 匯入 `render`，它會包上 Provider；直接用 RTL 的 `render` 會因找不到 `MantineProvider` 而報錯。
+- Mantine 樣式在 `src/main.tsx` 按元件引入，不用整包 `@mantine/core/styles.css`（CSS 約少 190 kB）。**新用到 Mantine 元件時，要把它的樣式補進去**，漏掉不會報錯，只是長得不對（沒有背景、版面跑掉）。引入順序要比照 `node_modules/@mantine/core/styles.css`，後面的規則會蓋掉前面的（例如 `UnstyledButton` 要在 `Button` 前面）；有些元件的樣式在別的檔案裡（`NativeSelect` 的下拉箭頭在 `Combobox.css`）。
 
 ## Release
 
