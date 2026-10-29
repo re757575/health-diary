@@ -31,6 +31,8 @@ export function Conditions() {
   /** 正在編輯的疾病 id；null 代表新增 */
   const [editingId, setEditingId] = useState<string | null>(null)
   const [status, setStatus] = useStatus()
+  /** 剛刪除的疾病，讓使用者能復原；做了別的操作就清掉 */
+  const [deleted, setDeleted] = useState<Condition | null>(null)
 
   const set = <K extends keyof ConditionFormValues>(key: K, value: ConditionFormValues[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }))
@@ -43,6 +45,7 @@ export function Conditions() {
   function startEdit(condition: Condition) {
     setForm(conditionToForm(condition))
     setEditingId(condition.id)
+    setDeleted(null)
     setStatus('')
   }
 
@@ -56,6 +59,7 @@ export function Conditions() {
       return
     }
     await saveCondition(parsed.data)
+    setDeleted(null)
     setStatus(`已${editingId ? '更新' : '新增'}「${parsed.data.name}」`)
     resetForm()
   }
@@ -64,7 +68,15 @@ export function Conditions() {
     await deleteCondition(condition.id)
     // 正在編輯的那筆被刪掉時，不能再讓表單以舊 id 存回去
     if (editingId === condition.id) resetForm()
+    setDeleted(condition)
     setStatus(`已刪除「${condition.name}」`)
+  }
+
+  async function handleUndo() {
+    if (!deleted) return
+    await saveCondition(deleted)
+    setDeleted(null)
+    setStatus(`已復原「${deleted.name}」`)
   }
 
   return (
@@ -148,7 +160,14 @@ export function Conditions() {
               </Button>
             )}
           </Group>
-          <Status status={status} />
+          <Group justify="space-between" wrap="nowrap">
+            <Status status={status} />
+            {deleted && (
+              <Button type="button" variant="light" size="compact-md" onClick={handleUndo}>
+                復原
+              </Button>
+            )}
+          </Group>
         </Stack>
       </form>
     </Section>

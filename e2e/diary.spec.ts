@@ -78,8 +78,20 @@ test('填寫基本資料與已知疾病 → 重新整理仍在 → 出現在 AI 
   await expect(prompt).toContainText('- 身高：175 cm')
   await expect(prompt).toContainText('- 高血壓（2020-03 起，穩定控制中）：每日服藥')
 
+  // 刪除後可以復原，內容不變，重新整理後也還在
   await page.getByRole('button', { name: '刪除 高血壓' }).click()
   await expect(page.getByText('尚未填寫。沒有已知疾病可略過。')).toBeVisible()
+  await page.getByRole('button', { name: '復原' }).click()
+  await expect(page.getByText('已復原「高血壓」')).toBeVisible()
+  await page.reload()
+  await expect(page.getByText('穩定控制中 · 2020-03 起 · 每日服藥')).toBeVisible()
+
+  // 不復原就是真的刪掉：重新整理後復原按鈕消失，疾病不會回來
+  await page.getByRole('button', { name: '刪除 高血壓' }).click()
+  await expect(page.getByText('已刪除「高血壓」')).toBeVisible()
+  await page.reload()
+  await expect(page.getByText('尚未填寫。沒有已知疾病可略過。')).toBeVisible()
+  await expect(page.getByRole('button', { name: '復原' })).toHaveCount(0)
 })
 
 test('匯出備份 → 匯入到全新環境還原資料', async ({ page, browser }) => {

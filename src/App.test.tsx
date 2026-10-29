@@ -110,6 +110,63 @@ describe('已知疾病', () => {
     expect(await db.conditions.count()).toBe(0)
   })
 
+  it('刪除後可以復原，疾病的內容與原本一致', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.type(await screen.findByLabelText('疾病名稱'), '高血壓')
+    await user.type(screen.getByLabelText('開始時間'), '2020-03')
+    await user.type(screen.getByLabelText(/疾病備註/), '每日服藥')
+    await user.click(screen.getByRole('button', { name: '新增疾病' }))
+    await user.click(await screen.findByRole('button', { name: '刪除 高血壓' }))
+    expect(await screen.findByText('已刪除「高血壓」')).toBeInTheDocument()
+    expect(await db.conditions.count()).toBe(0)
+
+    await user.click(screen.getByRole('button', { name: '復原' }))
+
+    expect(await screen.findByText('已復原「高血壓」')).toBeInTheDocument()
+    expect(await screen.findByText('穩定控制中 · 2020-03 起 · 每日服藥')).toBeInTheDocument()
+    expect(await db.conditions.count()).toBe(1)
+    // 復原後不能再復原一次
+    expect(screen.queryByRole('button', { name: '復原' })).not.toBeInTheDocument()
+  })
+
+  it('連續刪除兩筆時，復原的是最後刪除的那一筆', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    for (const name of ['高血壓', '胃食道逆流']) {
+      await user.type(await screen.findByLabelText('疾病名稱'), name)
+      await user.click(screen.getByRole('button', { name: '新增疾病' }))
+      await screen.findByText(`已新增「${name}」`)
+    }
+    await user.click(screen.getByRole('button', { name: '刪除 高血壓' }))
+    await user.click(await screen.findByRole('button', { name: '刪除 胃食道逆流' }))
+    await screen.findByText('已刪除「胃食道逆流」')
+
+    await user.click(screen.getByRole('button', { name: '復原' }))
+
+    expect(await screen.findByText('已復原「胃食道逆流」')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '編輯 胃食道逆流' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '編輯 高血壓' })).not.toBeInTheDocument()
+  })
+
+  it('刪除後做了別的操作，復原按鈕就會消失', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.type(await screen.findByLabelText('疾病名稱'), '高血壓')
+    await user.click(screen.getByRole('button', { name: '新增疾病' }))
+    await user.click(await screen.findByRole('button', { name: '刪除 高血壓' }))
+    expect(await screen.findByRole('button', { name: '復原' })).toBeInTheDocument()
+
+    await user.type(screen.getByLabelText('疾病名稱'), '胃食道逆流')
+    await user.click(screen.getByRole('button', { name: '新增疾病' }))
+
+    expect(await screen.findByText('已新增「胃食道逆流」')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '復原' })).not.toBeInTheDocument()
+  })
+
   it('刪除正在編輯的疾病後，表單回到新增模式', async () => {
     const user = userEvent.setup()
     render(<App />)
