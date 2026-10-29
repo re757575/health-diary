@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { getEntry, getProfile, listEntries } from '@/data/repository'
 import { emptyForm, entryToForm, toDateString } from '@/domain/form'
 import { sleepHours } from '@/domain/entry'
+import { AboutSection } from './AboutSection'
 import { Conditions } from './Conditions'
 import { DataTools } from './DataTools'
 import { EntryForm } from './EntryForm'
@@ -64,6 +65,8 @@ export default function App() {
           })}
         </ul>
       </section>
+
+      <AboutSection />
     </main>
   )
 }

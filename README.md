@@ -20,14 +20,15 @@ npx playwright install chromium   # 第一次跑 E2E 前
 npm run dev                       # http://localhost:5173/health-diary/
 ```
 
-| 指令                    | 說明                                       |
-| ----------------------- | ------------------------------------------ |
-| `npm test`              | 單元測試（Vitest）                         |
-| `npm run test:coverage` | 單元測試＋覆蓋率（domain 層）              |
-| `npm run e2e`           | E2E（會先 build 再用 `vite preview` 啟動） |
-| `npm run lint`          | ESLint + Prettier 檢查                     |
-| `npm run typecheck`     | TypeScript 型別檢查                        |
-| `npm run build`         | 建置到 `dist/`                             |
+| 指令                    | 說明                                         |
+| ----------------------- | -------------------------------------------- |
+| `npm test`              | 單元測試（Vitest）                           |
+| `npm run test:coverage` | 單元測試＋覆蓋率（domain 層）                |
+| `npm run e2e`           | E2E（會先 build 再用 `vite preview` 啟動）   |
+| `npm run lint`          | ESLint + Prettier 檢查                       |
+| `npm run typecheck`     | TypeScript 型別檢查                          |
+| `npm run build`         | 建置到 `dist/`                               |
+| `npm run release`       | 發布新版本：決定版號、更新 CHANGELOG、打 tag |
 
 ## Commit 前檢查
 
@@ -39,6 +40,19 @@ npm run dev                       # http://localhost:5173/health-diary/
 4. `npm run e2e`：E2E
 
 任何一步失敗都會中止 commit。
+
+## 版本發布
+
+頁面最下方的「關於」會顯示目前的 App 版本，版本號取自 `package.json` 的 `version`，建置時注入。版本號與 `CHANGELOG.md` 都由 [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) 依 commit 訊息（[Conventional Commits](https://www.conventionalcommits.org/)）自動產生，不手動修改 `version` 或編輯 `CHANGELOG.md`。
+
+```bash
+npm run release          # 依 commit 型別自動判斷版號
+npm run release:patch    # 強制升 patch 版號
+npm run release:minor    # 強制升 minor 版號
+npm run release:major    # 強制升 major 版號
+```
+
+執行前工作區要乾淨。它會更新 `package.json`（與 `package-lock.json`）的版本號、產生 `CHANGELOG.md`、建立 `chore(release): x.y.z` commit 並打上 `vX.Y.Z` tag，完成後再自行 push（`git push --follow-tags`）。
 
 ## 部署（GitHub Pages）
 

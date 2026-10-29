@@ -14,6 +14,10 @@ commit 前必須通過單元測試與 E2E，由 Husky 的 `.husky/pre-commit` �
 - `src/data/`：Dexie 與 repository；UI 只透過 repository 存取資料。
 - 改動資料結構（`Entry`）時：同步更新 Dexie `version`、備份格式的 `BACKUP_VERSION`，並確保舊備份仍可匯入。
 
+## Release
+
+**版本號與 `CHANGELOG.md` 一律由 `npm run release` 產生**（commit-and-tag-version，依 Conventional Commits），不手動改 `package.json` 的 `version` 或 `CHANGELOG.md`；release 會建立 commit 與 tag，只在使用者明確要求時執行。指令見 `README.md`「版本發布」。頁面最下方「關於」顯示的版本號就是 `version`。
+
 ## 其他
 
 - GitHub Pages 的 base path 是 `/health-diary/`（`vite.config.ts` 的 `BASE`、`playwright.config.ts` 的 `BASE_PATH`），E2E 的 `page.goto` 用相對路徑（`'./'`），不要以 `/` 開頭。
