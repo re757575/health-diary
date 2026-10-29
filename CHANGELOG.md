@@ -2,6 +2,11 @@
 
 本檔案由 [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) 依照 [Conventional Commits](https://www.conventionalcommits.org/) 規範的 commit 訊息自動產生，請勿手動編輯內容，執行 `npm run release` 即可更新。
 
+## [0.1.3](https://github.com/re757575/health-diary/compare/v0.1.2...v0.1.3) (2026-10-29)
+
+### Performance Improvements
+
+* 只引入用到的 Mantine 樣式並拆分 vendor chunk ([6ed1f06](https://github.com/re757575/health-diary/commit/6ed1f06b84289ecf20d29839fc782c8e7cf881f0))
 ## [0.1.2](https://github.com/re757575/health-diary/compare/v0.1.1...v0.1.2) (2026-10-29)
 
 ### Features
