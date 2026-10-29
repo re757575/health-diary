@@ -24,3 +24,7 @@ globalThis.ResizeObserver ??= class {
   unobserve() {}
   disconnect() {}
 }
+
+// jsdom 有 window.scrollTo，但呼叫時只會印出「Not implemented」，所以不能用 ??= 判斷，要直接蓋掉；
+// 需要檢查呼叫的測試自己改成 vi.fn()
+window.scrollTo = () => {}
