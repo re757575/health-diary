@@ -1,9 +1,49 @@
+/* 數字欄位的單位已寫在右側，不需要上下微調鈕；手機上本來就沒有 */
+input[type='number']::-webkit-inner-spin-button,
+input[type='number']::-webkit-outer-spin-button {
+  appearance: none;
+  margin: 0;
+}
+
+input[type='number'] {
+  appearance: textfield;
+}
+
+/* 文字欄位隨內容長高（支援的瀏覽器）；不支援時維持 rows 指定的高度 */
+textarea {
+  field-sizing: content;
+}
+
+textarea.mantine-Textarea-input {
+  min-height: 4.5rem;
+}
+
+/* 表單內的小節標題：比欄位標籤醒目，讓長表單好掃讀 */
+.section-label {
+  font-size: var(--mantine-font-size-sm);
+  font-weight: 600;
+  color: var(--mantine-color-text);
+}
+
 /* 欄位並排：窄螢幕自動折成一欄 */
 .fields {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
   gap: var(--mantine-spacing-sm);
   align-items: end;
+}
+
+/* 表單底部固定的儲存列：抵銷卡片的內距，讓它貼齊卡片左右與下緣 */
+.save-bar {
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
+  margin: var(--mantine-spacing-md) calc(-1 * var(--mantine-spacing-md))
+    calc(-1 * var(--mantine-spacing-md));
+  padding: var(--mantine-spacing-xs) var(--mantine-spacing-md);
+  background: var(--mantine-color-body);
+  border-top: 1px solid var(--mantine-color-default-border);
+  border-radius: 0 0 var(--mantine-radius-md) var(--mantine-radius-md);
 }
 
 /* 趨勢圖：系列色取自類別色票的槽 1（體重）與槽 2（睡眠），深色模式用同色票的深色階 */

@@ -27,6 +27,12 @@ export function toDateString(date: Date): string {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
 }
 
+/** 把 YYYY-MM-DD 前後移動幾天（以本地日曆計算，跨月、跨年、閏年都正確） */
+export function shiftDate(date: string, days: number): string {
+  const [year, month, day] = date.split('-').map(Number)
+  return toDateString(new Date(year!, month! - 1, day! + days))
+}
+
 export function emptyForm(date: string): FormValues {
   return {
     date,

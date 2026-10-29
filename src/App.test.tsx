@@ -22,7 +22,7 @@ describe('App', () => {
 
     expect(await screen.findByText(/已儲存 \d{4}-\d{2}-\d{2} 的紀錄/)).toBeInTheDocument()
     const history = await screen.findByRole('region', { name: '歷史紀錄' })
-    expect(await within(history).findByText(/^\d{4}-\d{2}-\d{2} · 70\.5 kg$/)).toBeInTheDocument()
+    expect(await within(history).findByText('70.5 kg')).toBeInTheDocument()
   })
 
   it('沒有紀錄時產生提示詞會提示無資料', async () => {
@@ -46,7 +46,8 @@ describe('App', () => {
     await user.upload(await screen.findByLabelText('匯入備份'), file)
 
     expect(await screen.findByText('已匯入 1 筆紀錄')).toBeInTheDocument()
-    expect(await screen.findByText('2026-01-02 · 65 kg')).toBeInTheDocument()
+    expect(await screen.findByText('2026-01-02')).toBeInTheDocument()
+    expect(screen.getByText('65 kg')).toBeInTheDocument()
   })
 
   it('匯入格式錯誤的檔案會顯示錯誤，不改動資料', async () => {
@@ -93,7 +94,7 @@ describe('已知疾病', () => {
     await user.type(screen.getByLabelText(/疾病備註/), '每日服藥')
     await user.click(screen.getByRole('button', { name: '新增疾病' }))
     expect(await screen.findByText('已新增「高血壓」')).toBeInTheDocument()
-    expect(await screen.findByText('高血壓 · 穩定控制中 · 每日服藥')).toBeInTheDocument()
+    expect(await screen.findByText('穩定控制中 · 每日服藥')).toBeInTheDocument()
     // 送出後表單清空，回到新增模式
     expect(screen.getByLabelText('疾病名稱')).toHaveValue('')
 
@@ -101,7 +102,7 @@ describe('已知疾病', () => {
     expect(screen.getByLabelText('疾病名稱')).toHaveValue('高血壓')
     await user.selectOptions(screen.getByLabelText('狀態'), '治療中／有症狀')
     await user.click(screen.getByRole('button', { name: '更新疾病' }))
-    expect(await screen.findByText('高血壓 · 治療中／有症狀 · 每日服藥')).toBeInTheDocument()
+    expect(await screen.findByText('治療中／有症狀 · 每日服藥')).toBeInTheDocument()
     expect(await db.conditions.count()).toBe(1) // 更新而不是新增一筆
 
     await user.click(screen.getByRole('button', { name: '刪除 高血壓' }))
@@ -155,7 +156,10 @@ describe('已知疾病', () => {
     )
 
     expect(await screen.findByText('已匯入 0 筆紀錄與 1 項疾病')).toBeInTheDocument()
-    expect(await screen.findByText('胃食道逆流 · 治療中／有症狀')).toBeInTheDocument()
+    // 狀態選單裡也有同名選項，所以只在清單裡找
+    const item = await screen.findByRole('listitem')
+    expect(within(item).getByText('胃食道逆流')).toBeInTheDocument()
+    expect(within(item).getByText('治療中／有症狀')).toBeInTheDocument()
   })
 })
 

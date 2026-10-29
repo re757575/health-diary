@@ -1,4 +1,4 @@
-import { Button, NativeSelect, Text, TextInput } from '@mantine/core'
+import { Button, NativeSelect, TextInput } from '@mantine/core'
 import { useState, type FormEvent } from 'react'
 import { saveProfile } from '@/data/repository'
 import {
@@ -10,6 +10,8 @@ import {
   type Profile,
   type ProfileFormValues,
 } from '@/domain/profile'
+import { Status } from './Status'
+import { useStatus } from './useStatus'
 
 interface Props {
   initial: Profile | undefined
@@ -17,7 +19,7 @@ interface Props {
 
 export function ProfileForm({ initial }: Props) {
   const [form, setForm] = useState(() => profileToForm(initial))
-  const [status, setStatus] = useState('')
+  const [status, setStatus] = useStatus()
 
   // 儲存的資料被外部改動（例如匯入備份覆蓋）時，表單跟著更新；
   // 自己儲存時資料與表單一致，表單內容與提示訊息都不受影響
@@ -35,7 +37,7 @@ export function ProfileForm({ initial }: Props) {
     event.preventDefault()
     const parsed = profileSchema.safeParse(formToProfile(form))
     if (!parsed.success) {
-      setStatus('身高需為 0–300 之間的數字')
+      setStatus('身高需為 0–300 之間的數字', true)
       return
     }
     await saveProfile(parsed.data)
@@ -74,9 +76,7 @@ export function ProfileForm({ initial }: Props) {
       <Button type="submit" mt="md">
         儲存基本資料
       </Button>
-      <Text role="status" size="sm" c="dimmed" mt="xs">
-        {status}
-      </Text>
+      <Status status={status} />
     </form>
   )
 }

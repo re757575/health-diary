@@ -1,4 +1,4 @@
-import { Button, Container, Divider, Group, Stack, Text, Title } from '@mantine/core'
+import { Badge, Button, Container, Divider, Group, Stack, Text, Title } from '@mantine/core'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Fragment, useState } from 'react'
 import { getEntry, getProfile, listEntries } from '@/data/repository'
@@ -20,14 +20,18 @@ export default function App() {
   // 同樣包一層物件區分「載入中」與「尚未填寫」
   const profile = useLiveQuery(async () => ({ value: await getProfile() }), [])
 
+  // 從歷史紀錄選一天來編輯時，表單在頁面上方，要帶使用者回去
+  function editDate(next: string) {
+    setDate(next)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
   return (
     <Container component="main" size="sm" py="md">
       <Stack gap="md">
         <Title order={1} size="h2">
           健康日記
         </Title>
-
-        <Section title="基本資料">{profile && <ProfileForm initial={profile.value} />}</Section>
 
         <Section title="每日紀錄">
           {loaded && (
@@ -41,10 +45,6 @@ export default function App() {
 
         {history && <TrendCharts entries={history} today={new Date()} />}
 
-        <Conditions />
-
-        <DataTools />
-
         <Section title="歷史紀錄">
           {history?.length === 0 && <Text>還沒有紀錄。</Text>}
           <Stack component="ul" gap={0} p={0} m={0} style={{ listStyle: 'none' }}>
@@ -54,13 +54,31 @@ export default function App() {
                 <Fragment key={entry.date}>
                   {i > 0 && <Divider component="li" />}
                   <Group component="li" justify="space-between" wrap="nowrap" py="xs">
-                    <Text>
-                      {entry.date}
-                      {entry.weightKg !== undefined && ` · ${entry.weightKg} kg`}
-                      {hours !== undefined && ` · 睡 ${hours} 小時`}
-                    </Text>
-                    <Button variant="light" size="compact-sm" onClick={() => setDate(entry.date)}>
-                      編輯 {entry.date}
+                    <div>
+                      <Group gap="xs">
+                        <Text fw={600}>{entry.date}</Text>
+                        {entry.date === date && (
+                          <Badge variant="light" size="sm">
+                            編輯中
+                          </Badge>
+                        )}
+                      </Group>
+                      <Text size="sm" c="dimmed">
+                        {[
+                          entry.weightKg !== undefined && `${entry.weightKg} kg`,
+                          hours !== undefined && `睡 ${hours} 小時`,
+                        ]
+                          .filter(Boolean)
+                          .join(' · ') || '只有文字紀錄'}
+                      </Text>
+                    </div>
+                    <Button
+                      variant="light"
+                      size="compact-md"
+                      aria-label={`編輯 ${entry.date}`}
+                      onClick={() => editDate(entry.date)}
+                    >
+                      編輯
                     </Button>
                   </Group>
                 </Fragment>
@@ -68,6 +86,12 @@ export default function App() {
             })}
           </Stack>
         </Section>
+
+        <Conditions />
+
+        <Section title="基本資料">{profile && <ProfileForm initial={profile.value} />}</Section>
+
+        <DataTools />
 
         <AboutSection />
       </Stack>

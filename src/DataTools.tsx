@@ -1,10 +1,12 @@
-import { Button, FileButton, Group, NativeSelect, Stack, Text, Textarea } from '@mantine/core'
+import { Button, FileButton, Group, NativeSelect, Stack, Textarea } from '@mantine/core'
 import { useRef, useState } from 'react'
 import { getProfile, importBackup, listConditions, listEntries } from '@/data/repository'
 import { parseBackup, serializeBackup } from '@/domain/backup'
 import { buildAnalysisPrompt, recentEntries } from '@/domain/prompt'
 import { toDateString } from '@/domain/form'
 import { Section } from './Section'
+import { Status } from './Status'
+import { useStatus } from './useStatus'
 
 const RANGES = [
   { label: '最近 7 天', days: 7 },
@@ -25,7 +27,7 @@ function download(filename: string, text: string) {
 export function DataTools() {
   const [days, setDays] = useState(7)
   const [prompt, setPrompt] = useState('')
-  const [status, setStatus] = useState('')
+  const [status, setStatus] = useStatus()
   const resetFileRef = useRef<() => void>(null)
 
   async function handleExport() {
@@ -44,7 +46,7 @@ export function DataTools() {
     if (!file) return
     const result = parseBackup(await file.text())
     if (!result.ok) {
-      setStatus(`匯入失敗：${result.error}`)
+      setStatus(`匯入失敗：${result.error}`, true)
       return
     }
     await importBackup(result)
@@ -59,7 +61,7 @@ export function DataTools() {
     const entries = recentEntries(await listEntries(), days, new Date())
     if (entries.length === 0) {
       setPrompt('')
-      setStatus('這段期間沒有紀錄可以分析')
+      setStatus('這段期間沒有紀錄可以分析', true)
       return
     }
     const text = buildAnalysisPrompt(entries, {
@@ -71,7 +73,7 @@ export function DataTools() {
       await navigator.clipboard.writeText(text)
       setStatus('已複製提示詞，貼給 AI 即可')
     } catch {
-      setStatus('無法自動複製，請手動複製下方提示詞')
+      setStatus('無法自動複製，請手動複製下方提示詞', true)
     }
   }
 
@@ -108,9 +110,7 @@ export function DataTools() {
             )}
           </FileButton>
         </Group>
-        <Text role="status" size="sm" c="dimmed">
-          {status}
-        </Text>
+        <Status status={status} />
       </Stack>
     </Section>
   )

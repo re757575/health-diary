@@ -1,10 +1,22 @@
 import { describe, expect, it } from 'vitest'
 import { entrySchema } from './entry'
-import { emptyForm, entryToForm, formToEntry, toDateString } from './form'
+import { emptyForm, entryToForm, formToEntry, shiftDate, toDateString } from './form'
 
 describe('toDateString', () => {
   it('使用本地時區，個位數月日補零', () => {
     expect(toDateString(new Date(2026, 0, 5, 23, 59))).toBe('2026-01-05')
+  })
+})
+
+describe('shiftDate', () => {
+  it('跨月、跨年與閏年', () => {
+    expect(shiftDate('2026-03-01', -1)).toBe('2026-02-28')
+    expect(shiftDate('2024-03-01', -1)).toBe('2024-02-29')
+    expect(shiftDate('2026-12-31', 1)).toBe('2027-01-01')
+  })
+
+  it('移動 0 天維持原日期', () => {
+    expect(shiftDate('2026-10-29', 0)).toBe('2026-10-29')
   })
 })
 

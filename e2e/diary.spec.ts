@@ -15,9 +15,7 @@ test('記錄一天 → 重新整理仍在 → 產生 AI 提示詞', async ({ pag
   // 資料存在裝置上：重新整理後仍在
   await page.reload()
   await expect(
-    page
-      .getByRole('region', { name: '歷史紀錄' })
-      .getByText(/^\d{4}-\d{2}-\d{2} · 70\.5 kg · 睡 7\.5 小時$/),
+    page.getByRole('region', { name: '歷史紀錄' }).getByText('70.5 kg · 睡 7.5 小時'),
   ).toBeVisible()
   await expect(page.getByLabel('早餐')).toHaveValue('燕麥奶加香蕉')
 
@@ -45,7 +43,7 @@ test('填寫基本資料與已知疾病 → 重新整理仍在 → 出現在 AI 
 
   await page.reload()
   await expect(page.getByLabel('身高（cm）')).toHaveValue('175')
-  await expect(page.getByText('高血壓 · 穩定控制中 · 2020-03 起 · 每日服藥')).toBeVisible()
+  await expect(page.getByText('穩定控制中 · 2020-03 起 · 每日服藥')).toBeVisible()
 
   // 提示詞需要至少一天的紀錄
   await page.getByLabel('體重（kg）').fill('70')
@@ -88,10 +86,10 @@ test('匯出備份 → 匯入到全新環境還原資料', async ({ page, browse
 
   await fresh.getByLabel('匯入備份').setInputFiles(backupPath)
   await expect(fresh.getByText('已匯入 1 筆紀錄與 1 項疾病')).toBeVisible()
+  await expect(fresh.getByRole('region', { name: '歷史紀錄' }).getByText('68.2 kg')).toBeVisible()
   await expect(
-    fresh.getByRole('region', { name: '歷史紀錄' }).getByText(/^\d{4}-\d{2}-\d{2} · 68\.2 kg$/),
+    fresh.getByRole('region', { name: '已知疾病' }).getByText('胃食道逆流'),
   ).toBeVisible()
-  await expect(fresh.getByText('胃食道逆流 · 穩定控制中')).toBeVisible()
   await expect(fresh.getByLabel('身高（cm）')).toHaveValue('172')
   await context.close()
 })

@@ -22,13 +22,15 @@ import {
   type ConditionFormValues,
 } from '@/domain/condition'
 import { Section } from './Section'
+import { Status } from './Status'
+import { useStatus } from './useStatus'
 
 export function Conditions() {
   const conditions = useLiveQuery(listConditions, [])
   const [form, setForm] = useState<ConditionFormValues>(emptyConditionForm)
   /** 正在編輯的疾病 id；null 代表新增 */
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [status, setStatus] = useState('')
+  const [status, setStatus] = useStatus()
 
   const set = <K extends keyof ConditionFormValues>(key: K, value: ConditionFormValues[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }))
@@ -50,7 +52,7 @@ export function Conditions() {
       formToCondition(form, editingId ?? crypto.randomUUID()),
     )
     if (!parsed.success) {
-      setStatus('請填寫疾病名稱，開始時間格式需為年月')
+      setStatus('請填寫疾病名稱，開始時間格式需為年月', true)
       return
     }
     await saveCondition(parsed.data)
@@ -73,23 +75,31 @@ export function Conditions() {
           <Fragment key={c.id}>
             {i > 0 && <Divider component="li" />}
             <Group component="li" justify="space-between" wrap="nowrap" py="xs">
-              <Text>
-                {c.name}
-                {` · ${CONDITION_STATUS_LABELS[c.status]}`}
-                {c.since && ` · ${c.since} 起`}
-                {c.notes && ` · ${c.notes}`}
-              </Text>
+              <div>
+                <Text fw={600}>{c.name}</Text>
+                <Text size="sm" c="dimmed">
+                  {[CONDITION_STATUS_LABELS[c.status], c.since && `${c.since} 起`, c.notes]
+                    .filter(Boolean)
+                    .join(' · ')}
+                </Text>
+              </div>
               <Group gap="xs" wrap="nowrap">
-                <Button variant="light" size="compact-sm" onClick={() => startEdit(c)}>
-                  編輯 {c.name}
+                <Button
+                  variant="light"
+                  size="compact-md"
+                  aria-label={`編輯 ${c.name}`}
+                  onClick={() => startEdit(c)}
+                >
+                  編輯
                 </Button>
                 <Button
                   variant="light"
                   color="red"
-                  size="compact-sm"
+                  size="compact-md"
+                  aria-label={`刪除 ${c.name}`}
                   onClick={() => handleDelete(c)}
                 >
-                  刪除 {c.name}
+                  刪除
                 </Button>
               </Group>
             </Group>
@@ -138,9 +148,7 @@ export function Conditions() {
               </Button>
             )}
           </Group>
-          <Text role="status" size="sm" c="dimmed">
-            {status}
-          </Text>
+          <Status status={status} />
         </Stack>
       </form>
     </Section>
