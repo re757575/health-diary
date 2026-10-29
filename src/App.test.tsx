@@ -1,12 +1,15 @@
 import { screen, waitFor, within } from '@testing-library/react'
 import { render } from '@/test/render'
-import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it } from 'vitest'
+import userEvent, { type UserEvent } from '@testing-library/user-event'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { db } from '@/data/db'
 import { getProfile } from '@/data/repository'
 import { serializeBackup } from '@/domain/backup'
 import { shiftDate, toDateString } from '@/domain/form'
 import App from './App'
+
+const openTab = (user: UserEvent, name: '今天' | '趨勢' | '設定') =>
+  user.click(screen.getByRole('tab', { name }))
 
 beforeEach(async () => {
   await Promise.all([db.entries.clear(), db.conditions.clear(), db.profile.clear()])
@@ -22,6 +25,7 @@ describe('App', () => {
     await user.click(screen.getByRole('button', { name: '儲存' }))
 
     expect(await screen.findByText(/已儲存 \d{4}-\d{2}-\d{2} 的紀錄/)).toBeInTheDocument()
+    await openTab(user, '趨勢')
     const history = await screen.findByRole('region', { name: '歷史紀錄' })
     expect(await within(history).findByText('70.5 kg')).toBeInTheDocument()
   })
@@ -30,6 +34,7 @@ describe('App', () => {
     const user = userEvent.setup()
     render(<App />)
 
+    await openTab(user, '設定')
     await user.click(await screen.findByRole('button', { name: '產生 AI 提示詞' }))
 
     expect(await screen.findByText('這段期間沒有紀錄可以分析')).toBeInTheDocument()
@@ -44,9 +49,11 @@ describe('App', () => {
       conditions: [],
     })
     const file = new File([backup], 'backup.json', { type: 'application/json' })
+    await openTab(user, '設定')
     await user.upload(await screen.findByLabelText('匯入備份'), file)
 
     expect(await screen.findByText('已匯入 1 筆紀錄')).toBeInTheDocument()
+    await openTab(user, '趨勢')
     expect(await screen.findByText('2026-01-02')).toBeInTheDocument()
     expect(screen.getByText('65 kg')).toBeInTheDocument()
   })
@@ -56,10 +63,75 @@ describe('App', () => {
     render(<App />)
 
     const file = new File(['{"foo":1}'], 'bad.json', { type: 'application/json' })
+    await openTab(user, '設定')
     await user.upload(await screen.findByLabelText('匯入備份'), file)
 
     expect(await screen.findByText(/匯入失敗/)).toBeInTheDocument()
     expect(await db.entries.count()).toBe(0)
+  })
+})
+
+describe('分頁', () => {
+  it('預設在「今天」，只看得到每日紀錄', async () => {
+    render(<App />)
+
+    expect(await screen.findByRole('region', { name: '每日紀錄' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: '今天' })).toHaveAttribute('aria-selected', 'true')
+    for (const name of ['歷史紀錄', '已知疾病', '基本資料', 'AI 分析與資料備份']) {
+      expect(screen.queryByRole('region', { name })).not.toBeInTheDocument()
+    }
+  })
+
+  it('各分頁放的區塊：趨勢有趨勢圖與歷史紀錄，設定有疾病、基本資料、備份與關於', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await openTab(user, '趨勢')
+    expect(await screen.findByRole('region', { name: '最近 30 天趨勢' })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: '歷史紀錄' })).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: '每日紀錄' })).not.toBeInTheDocument()
+
+    await openTab(user, '設定')
+    for (const name of ['已知疾病', '基本資料', 'AI 分析與資料備份', '關於']) {
+      expect(await screen.findByRole('region', { name })).toBeInTheDocument()
+    }
+    expect(screen.queryByRole('region', { name: '歷史紀錄' })).not.toBeInTheDocument()
+  })
+
+  it('切換分頁不會丟掉還沒儲存的輸入', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.type(await screen.findByLabelText('體重（kg）'), '70.5')
+    await user.type(screen.getByLabelText('早餐'), '燕麥奶')
+    await openTab(user, '設定')
+    await openTab(user, '今天')
+
+    expect(screen.getByLabelText('體重（kg）')).toHaveValue(70.5)
+    expect(screen.getByLabelText('早餐')).toHaveValue('燕麥奶')
+  })
+
+  it('在歷史紀錄按「編輯」會切回「今天」並載入那一天', async () => {
+    const user = userEvent.setup()
+    await db.entries.put({ date: '2026-01-02', weightKg: 65, meals: [], bowel: [] })
+    render(<App />)
+
+    await openTab(user, '趨勢')
+    await user.click(await screen.findByRole('button', { name: '編輯 2026-01-02' }))
+
+    expect(screen.getByRole('tab', { name: '今天' })).toHaveAttribute('aria-selected', 'true')
+    expect(await screen.findByLabelText('日期')).toHaveValue('2026-01-02')
+    expect(screen.getByLabelText('體重（kg）')).toHaveValue(65)
+  })
+
+  it('切換分頁會回到頁面頂端', async () => {
+    const user = userEvent.setup()
+    window.scrollTo = vi.fn()
+    render(<App />)
+
+    await openTab(user, '設定')
+
+    expect(window.scrollTo).toHaveBeenCalledWith({ top: 0 })
   })
 })
 
@@ -83,17 +155,6 @@ describe('切換日期', () => {
     await waitFor(() => expect(screen.getByLabelText('日期')).toHaveValue(today))
     expect(screen.getByLabelText('體重（kg）')).toHaveValue(70)
   })
-
-  it('在歷史紀錄按「編輯」會載入那一天的紀錄，不是空表單', async () => {
-    const user = userEvent.setup()
-    await db.entries.put({ date: '2026-01-02', weightKg: 65, meals: [], bowel: [] })
-    render(<App />)
-
-    await user.click(await screen.findByRole('button', { name: '編輯 2026-01-02' }))
-
-    await waitFor(() => expect(screen.getByLabelText('日期')).toHaveValue('2026-01-02'))
-    expect(screen.getByLabelText('體重（kg）')).toHaveValue(65)
-  })
 })
 
 describe('趨勢圖', () => {
@@ -101,14 +162,18 @@ describe('趨勢圖', () => {
     const user = userEvent.setup()
     render(<App />)
 
+    await openTab(user, '趨勢')
     expect(await screen.findByText('最近 30 天還沒有體重紀錄')).toBeInTheDocument()
     expect(screen.queryByRole('img', { name: /折線圖/ })).not.toBeInTheDocument()
 
+    await openTab(user, '今天')
     await user.type(screen.getByLabelText('體重（kg）'), '70.5')
     await user.type(screen.getByLabelText('入睡時間'), '23:30')
     await user.type(screen.getByLabelText('起床時間'), '07:00')
     await user.click(screen.getByRole('button', { name: '儲存' }))
+    await screen.findByText(/已儲存 \d{4}-\d{2}-\d{2} 的紀錄/)
 
+    await openTab(user, '趨勢')
     expect(
       await screen.findByRole('img', { name: '體重趨勢折線圖，共 1 筆紀錄' }),
     ).toBeInTheDocument()
@@ -122,6 +187,7 @@ describe('已知疾病', () => {
     const user = userEvent.setup()
     render(<App />)
 
+    await openTab(user, '設定')
     expect(await screen.findByText('尚未填寫。沒有已知疾病可略過。')).toBeInTheDocument()
 
     await user.type(screen.getByLabelText('疾病名稱'), '高血壓')
@@ -148,6 +214,7 @@ describe('已知疾病', () => {
     const user = userEvent.setup()
     render(<App />)
 
+    await openTab(user, '設定')
     await user.type(await screen.findByLabelText('疾病名稱'), '高血壓')
     await user.type(screen.getByLabelText('開始時間'), '2020-03')
     await user.type(screen.getByLabelText(/疾病備註/), '每日服藥')
@@ -169,6 +236,7 @@ describe('已知疾病', () => {
     const user = userEvent.setup()
     render(<App />)
 
+    await openTab(user, '設定')
     for (const name of ['高血壓', '胃食道逆流']) {
       await user.type(await screen.findByLabelText('疾病名稱'), name)
       await user.click(screen.getByRole('button', { name: '新增疾病' }))
@@ -189,6 +257,7 @@ describe('已知疾病', () => {
     const user = userEvent.setup()
     render(<App />)
 
+    await openTab(user, '設定')
     await user.type(await screen.findByLabelText('疾病名稱'), '高血壓')
     await user.click(screen.getByRole('button', { name: '新增疾病' }))
     await user.click(await screen.findByRole('button', { name: '刪除 高血壓' }))
@@ -205,6 +274,7 @@ describe('已知疾病', () => {
     const user = userEvent.setup()
     render(<App />)
 
+    await openTab(user, '設定')
     await user.type(await screen.findByLabelText('疾病名稱'), '高血壓')
     await user.click(screen.getByRole('button', { name: '新增疾病' }))
     await user.click(await screen.findByRole('button', { name: '編輯 高血壓' }))
@@ -218,14 +288,17 @@ describe('已知疾病', () => {
     const user = userEvent.setup()
     render(<App />)
 
+    await openTab(user, '設定')
     await user.type(await screen.findByLabelText('疾病名稱'), '高血壓')
     await user.click(screen.getByRole('button', { name: '新增疾病' }))
     await user.type(screen.getByLabelText('身高（cm）'), '175')
     await user.click(screen.getByRole('button', { name: '儲存基本資料' }))
+    await openTab(user, '今天')
     await user.type(screen.getByLabelText('體重（kg）'), '70')
     await user.click(screen.getByRole('button', { name: '儲存' }))
     await screen.findByText(/已儲存 \d{4}-\d{2}-\d{2} 的紀錄/)
 
+    await openTab(user, '設定')
     await user.click(screen.getByRole('button', { name: '產生 AI 提示詞' }))
 
     const prompt = (await screen.findByLabelText('提示詞')) as HTMLTextAreaElement
@@ -237,6 +310,7 @@ describe('已知疾病', () => {
     const user = userEvent.setup()
     render(<App />)
 
+    await openTab(user, '設定')
     const backup = serializeBackup({
       entries: [],
       conditions: [{ id: 'c1', name: '胃食道逆流', status: 'active' }],
@@ -259,6 +333,7 @@ describe('基本資料', () => {
     const user = userEvent.setup()
     render(<App />)
 
+    await openTab(user, '設定')
     await user.type(await screen.findByLabelText('生日'), '1990-05-20')
     await user.type(screen.getByLabelText('身高（cm）'), '175.5')
     await user.selectOptions(screen.getByLabelText('性別'), '女')
@@ -269,9 +344,11 @@ describe('基本資料', () => {
   })
 
   it('開啟時載入已儲存的資料', async () => {
+    const user = userEvent.setup()
     await db.profile.put({ id: 'me', birthday: '1990-05-20', heightCm: 175 })
     render(<App />)
 
+    await openTab(user, '設定')
     expect(await screen.findByLabelText('生日')).toHaveValue('1990-05-20')
     expect(screen.getByLabelText('身高（cm）')).toHaveValue(175)
   })
@@ -280,6 +357,7 @@ describe('基本資料', () => {
     const user = userEvent.setup()
     await db.profile.put({ id: 'me', heightCm: 170 })
     render(<App />)
+    await openTab(user, '設定')
     expect(await screen.findByLabelText('身高（cm）')).toHaveValue(170)
 
     const backup = serializeBackup({ entries: [], conditions: [], profile: { heightCm: 180 } })

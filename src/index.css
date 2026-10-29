@@ -25,6 +25,20 @@ textarea.mantine-Textarea-input {
   color: var(--mantine-color-text);
 }
 
+/* 分頁列固定在頂端：捲到表單深處也能切換 */
+.app-tabs {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: var(--mantine-color-body);
+}
+
+/* 分頁標籤：字與點擊範圍放大，手機單手好點 */
+.app-tabs .mantine-Tabs-tab {
+  padding-block: var(--mantine-spacing-sm);
+  font-size: var(--mantine-font-size-md);
+}
+
 /* 欄位並排：窄螢幕自動折成一欄 */
 .fields {
   display: grid;
