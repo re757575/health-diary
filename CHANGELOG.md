@@ -2,6 +2,14 @@
 
 本檔案由 [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) 依照 [Conventional Commits](https://www.conventionalcommits.org/) 規範的 commit 訊息自動產生，請勿手動編輯內容，執行 `npm run release` 即可更新。
 
+## [0.1.2](https://github.com/re757575/health-diary/compare/v0.1.1...v0.1.2) (2026-10-29)
+
+### Features
+
+* **conditions:** 刪除已知疾病後可以復原 ([b9993c8](https://github.com/re757575/health-diary/commit/b9993c861432c2e844e05f6af0bbc092533c6b00))
+* **ui:** 改用 Mantine 重做介面 ([6e70b89](https://github.com/re757575/health-diary/commit/6e70b89682737635dda483e7c5a9296cda89c83d))
+* **ui:** 重排版面並加強每日紀錄表單的易用性 ([1e2450d](https://github.com/re757575/health-diary/commit/1e2450d82315507666ad804a444d002b6c5d9b8c))
+* **ui:** 評分欄位改為可取消的點選按鈕並加上分數說明 ([46619f7](https://github.com/re757575/health-diary/commit/46619f743fb33e143ddcc0803bc4937cd12bc83b))
 ## [0.1.1](https://github.com/re757575/health-diary/compare/v0.1.0...v0.1.1) (2026-10-29)
 
 ### Build System
