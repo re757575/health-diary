@@ -2,6 +2,7 @@ import { Fragment, useId } from 'react'
 import { buildLineChart, type ChartBox } from '@/domain/chart-scale'
 import type { Entry } from '@/domain/entry'
 import { buildTrends, summarizeSeries, type TrendPoint } from '@/domain/trend'
+import { Section } from './Section'
 
 interface Props {
   entries: Entry[]
@@ -154,8 +155,7 @@ export function TrendCharts({ entries, today }: Props) {
   const trends = buildTrends(entries, today, DAYS)
 
   return (
-    <section aria-labelledby="trends-heading">
-      <h2 id="trends-heading">最近 {DAYS} 天趨勢</h2>
+    <Section title={`最近 ${DAYS} 天趨勢`}>
       <TrendChart
         title="體重趨勢"
         subject="體重"
@@ -176,6 +176,6 @@ export function TrendCharts({ entries, today }: Props) {
         points={trends.sleepHours}
         startDate={trends.startDate}
       />
-    </section>
+    </Section>
   )
 }

@@ -14,6 +14,14 @@ commit 前必須通過單元測試與 E2E，由 Husky 的 `.husky/pre-commit` �
 - `src/data/`：Dexie 與 repository；UI 只透過 repository 存取資料。
 - 改動資料結構（`Entry`）時：同步更新 Dexie `version`、備份格式的 `BACKUP_VERSION`，並確保舊備份仍可匯入。
 
+## UI
+
+UI 庫是 Mantine（`@mantine/core`），`MantineProvider` 在 `src/Providers.tsx`，主題在 `src/theme.ts`。
+
+- 日期、時間、數字欄位用 `TextInput type=...`、下拉用 `NativeSelect`，保留原生控制項（手機體驗與測試的 `selectOption` 都依賴它）。
+- 區塊用 `Section`（有標題的卡片，標題即 region 名稱）。
+- 單元測試要從 `@/test/render` 匯入 `render`，它會包上 Provider；直接用 RTL 的 `render` 會因找不到 `MantineProvider` 而報錯。
+
 ## Release
 
 **版本號與 `CHANGELOG.md` 一律由 `npm run release` 產生**（commit-and-tag-version，依 Conventional Commits），不手動改 `package.json` 的 `version` 或 `CHANGELOG.md`；release 會建立 commit 與 tag，只在使用者明確要求時執行。指令見 `README.md`「版本發布」。頁面最下方「關於」顯示的版本號就是 `version`。

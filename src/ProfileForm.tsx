@@ -1,3 +1,4 @@
+import { Button, NativeSelect, Text, TextInput } from '@mantine/core'
 import { useState, type FormEvent } from 'react'
 import { saveProfile } from '@/data/repository'
 import {
@@ -43,46 +44,39 @@ export function ProfileForm({ initial }: Props) {
 
   return (
     <form onSubmit={handleSubmit}>
-      <div className="row">
-        <label>
-          生日
-          <input
-            type="date"
-            value={form.birthday}
-            onChange={(e) => set('birthday', e.target.value)}
-          />
-        </label>
-        <label>
-          身高（cm）
-          <input
-            type="number"
-            inputMode="decimal"
-            step="0.1"
-            min="0"
-            max="300"
-            value={form.heightCm}
-            onChange={(e) => set('heightCm', e.target.value)}
-          />
-        </label>
-        <label>
-          性別
-          <select
-            value={form.sex}
-            onChange={(e) => set('sex', e.target.value as ProfileFormValues['sex'])}
-          >
-            <option value="">不填</option>
-            {SEXES.map((s) => (
-              <option key={s} value={s}>
-                {SEX_LABELS[s]}
-              </option>
-            ))}
-          </select>
-        </label>
+      <div className="fields">
+        <TextInput
+          label="生日"
+          type="date"
+          value={form.birthday}
+          onChange={(e) => set('birthday', e.target.value)}
+        />
+        <TextInput
+          label="身高（cm）"
+          type="number"
+          inputMode="decimal"
+          step="0.1"
+          min="0"
+          max="300"
+          value={form.heightCm}
+          onChange={(e) => set('heightCm', e.target.value)}
+        />
+        <NativeSelect
+          label="性別"
+          data={[
+            { value: '', label: '不填' },
+            ...SEXES.map((s) => ({ value: s, label: SEX_LABELS[s] })),
+          ]}
+          value={form.sex}
+          onChange={(e) => set('sex', e.target.value as ProfileFormValues['sex'])}
+        />
       </div>
-      <button type="submit">儲存基本資料</button>
-      <p className="status" role="status">
+      <Button type="submit" mt="md">
+        儲存基本資料
+      </Button>
+      <Text role="status" size="sm" c="dimmed" mt="xs">
         {status}
-      </p>
+      </Text>
     </form>
   )
 }

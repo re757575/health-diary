@@ -1,8 +1,10 @@
-import { useState, type ChangeEvent } from 'react'
+import { Button, FileButton, Group, NativeSelect, Stack, Text, Textarea } from '@mantine/core'
+import { useRef, useState } from 'react'
 import { getProfile, importBackup, listConditions, listEntries } from '@/data/repository'
 import { parseBackup, serializeBackup } from '@/domain/backup'
 import { buildAnalysisPrompt, recentEntries } from '@/domain/prompt'
 import { toDateString } from '@/domain/form'
+import { Section } from './Section'
 
 const RANGES = [
   { label: '最近 7 天', days: 7 },
@@ -24,6 +26,7 @@ export function DataTools() {
   const [days, setDays] = useState(7)
   const [prompt, setPrompt] = useState('')
   const [status, setStatus] = useState('')
+  const resetFileRef = useRef<() => void>(null)
 
   async function handleExport() {
     const now = new Date()
@@ -36,9 +39,8 @@ export function DataTools() {
     setStatus('已匯出備份檔')
   }
 
-  async function handleImport(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0]
-    event.target.value = '' // 讓同一個檔案可以再選一次
+  async function handleImport(file: File | null) {
+    resetFileRef.current?.() // 讓同一個檔案可以再選一次
     if (!file) return
     const result = parseBackup(await file.text())
     if (!result.ok) {
@@ -74,42 +76,42 @@ export function DataTools() {
   }
 
   return (
-    <section aria-labelledby="data-tools-heading">
-      <h2 id="data-tools-heading">AI 分析與資料備份</h2>
-      <div className="row">
-        <label>
-          分析範圍
-          <select value={days} onChange={(e) => setDays(Number(e.target.value))}>
-            {RANGES.map((r) => (
-              <option key={r.label} value={r.days}>
-                {r.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <button type="button" onClick={handleGeneratePrompt}>
-          產生 AI 提示詞
-        </button>
-      </div>
-      {prompt && (
-        <label>
-          提示詞
-          <textarea readOnly rows={8} value={prompt} />
-        </label>
-      )}
+    <Section title="AI 分析與資料備份">
+      <Stack gap="md">
+        <Group align="flex-end">
+          <NativeSelect
+            label="分析範圍"
+            data={RANGES.map((r) => ({ value: String(r.days), label: r.label }))}
+            value={String(days)}
+            onChange={(e) => setDays(Number(e.target.value))}
+          />
+          <Button type="button" onClick={handleGeneratePrompt}>
+            產生 AI 提示詞
+          </Button>
+        </Group>
+        {prompt && <Textarea label="提示詞" readOnly rows={8} value={prompt} />}
 
-      <div className="row">
-        <button type="button" onClick={handleExport}>
-          匯出備份
-        </button>
-        <label>
-          匯入備份
-          <input type="file" accept="application/json,.json" onChange={handleImport} />
-        </label>
-      </div>
-      <p className="status" role="status">
-        {status}
-      </p>
-    </section>
+        <Group>
+          <Button type="button" variant="light" onClick={handleExport}>
+            匯出備份
+          </Button>
+          <FileButton
+            resetRef={resetFileRef}
+            accept="application/json,.json"
+            onChange={handleImport}
+            inputProps={{ 'aria-label': '匯入備份' }}
+          >
+            {(props) => (
+              <Button variant="light" {...props}>
+                選擇檔案匯入
+              </Button>
+            )}
+          </FileButton>
+        </Group>
+        <Text role="status" size="sm" c="dimmed">
+          {status}
+        </Text>
+      </Stack>
+    </Section>
   )
 }

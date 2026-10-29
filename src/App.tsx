@@ -1,5 +1,6 @@
+import { Button, Container, Divider, Group, Stack, Text, Title } from '@mantine/core'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { useState } from 'react'
+import { Fragment, useState } from 'react'
 import { getEntry, getProfile, listEntries } from '@/data/repository'
 import { emptyForm, entryToForm, toDateString } from '@/domain/form'
 import { sleepHours } from '@/domain/entry'
@@ -8,6 +9,7 @@ import { Conditions } from './Conditions'
 import { DataTools } from './DataTools'
 import { EntryForm } from './EntryForm'
 import { ProfileForm } from './ProfileForm'
+import { Section } from './Section'
 import { TrendCharts } from './TrendCharts'
 
 export default function App() {
@@ -19,54 +21,56 @@ export default function App() {
   const profile = useLiveQuery(async () => ({ value: await getProfile() }), [])
 
   return (
-    <main>
-      <h1>健康日記</h1>
+    <Container component="main" size="sm" py="md">
+      <Stack gap="md">
+        <Title order={1} size="h2">
+          健康日記
+        </Title>
 
-      <section aria-labelledby="profile-heading">
-        <h2 id="profile-heading">基本資料</h2>
-        {profile && <ProfileForm initial={profile.value} />}
-      </section>
+        <Section title="基本資料">{profile && <ProfileForm initial={profile.value} />}</Section>
 
-      <section aria-labelledby="entry-heading">
-        <h2 id="entry-heading">每日紀錄</h2>
-        {loaded && (
-          <EntryForm
-            key={date}
-            initial={loaded.entry ? entryToForm(loaded.entry) : emptyForm(date)}
-            onDateChange={setDate}
-          />
-        )}
-      </section>
+        <Section title="每日紀錄">
+          {loaded && (
+            <EntryForm
+              key={date}
+              initial={loaded.entry ? entryToForm(loaded.entry) : emptyForm(date)}
+              onDateChange={setDate}
+            />
+          )}
+        </Section>
 
-      {history && <TrendCharts entries={history} today={new Date()} />}
+        {history && <TrendCharts entries={history} today={new Date()} />}
 
-      <Conditions />
+        <Conditions />
 
-      <DataTools />
+        <DataTools />
 
-      <section aria-labelledby="history-heading">
-        <h2 id="history-heading">歷史紀錄</h2>
-        {history?.length === 0 && <p>還沒有紀錄。</p>}
-        <ul className="history">
-          {history?.map((entry) => {
-            const hours = sleepHours(entry.sleep)
-            return (
-              <li key={entry.date}>
-                <span>
-                  {entry.date}
-                  {entry.weightKg !== undefined && ` · ${entry.weightKg} kg`}
-                  {hours !== undefined && ` · 睡 ${hours} 小時`}
-                </span>
-                <button type="button" onClick={() => setDate(entry.date)}>
-                  編輯 {entry.date}
-                </button>
-              </li>
-            )
-          })}
-        </ul>
-      </section>
+        <Section title="歷史紀錄">
+          {history?.length === 0 && <Text>還沒有紀錄。</Text>}
+          <Stack component="ul" gap={0} p={0} m={0} style={{ listStyle: 'none' }}>
+            {history?.map((entry, i) => {
+              const hours = sleepHours(entry.sleep)
+              return (
+                <Fragment key={entry.date}>
+                  {i > 0 && <Divider component="li" />}
+                  <Group component="li" justify="space-between" wrap="nowrap" py="xs">
+                    <Text>
+                      {entry.date}
+                      {entry.weightKg !== undefined && ` · ${entry.weightKg} kg`}
+                      {hours !== undefined && ` · 睡 ${hours} 小時`}
+                    </Text>
+                    <Button variant="light" size="compact-sm" onClick={() => setDate(entry.date)}>
+                      編輯 {entry.date}
+                    </Button>
+                  </Group>
+                </Fragment>
+              )
+            })}
+          </Stack>
+        </Section>
 
-      <AboutSection />
-    </main>
+        <AboutSection />
+      </Stack>
+    </Container>
   )
 }

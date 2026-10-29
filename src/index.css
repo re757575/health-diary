@@ -1,101 +1,9 @@
-:root {
-  color-scheme: light dark;
-  font-family:
-    system-ui,
-    -apple-system,
-    'Noto Sans TC',
-    'PingFang TC',
-    'Microsoft JhengHei',
-    sans-serif;
-  line-height: 1.5;
-}
-
-* {
-  box-sizing: border-box;
-}
-
-body {
-  margin: 0;
-}
-
-main {
-  max-width: 40rem;
-  margin: 0 auto;
-  padding: 1rem;
-}
-
-h1 {
-  font-size: 1.5rem;
-  margin: 0 0 1rem;
-}
-
-h2 {
-  font-size: 1.125rem;
-  margin: 0 0 0.75rem;
-}
-
-section {
-  margin-bottom: 1.5rem;
-  padding: 1rem;
-  border: 1px solid color-mix(in srgb, currentColor 20%, transparent);
-  border-radius: 0.5rem;
-}
-
-label {
-  display: block;
-  margin-bottom: 0.75rem;
-  font-size: 0.875rem;
-}
-
-input,
-textarea,
-select,
-button {
-  font: inherit;
-}
-
-input:not([type='file']),
-textarea,
-select {
-  display: block;
-  width: 100%;
-  margin-top: 0.25rem;
-  padding: 0.5rem;
-}
-
-button {
-  padding: 0.5rem 0.75rem;
-  cursor: pointer;
-}
-
-.row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  align-items: flex-end;
-}
-
-.row > label {
-  flex: 1 1 8rem;
-}
-
-.history {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.history li {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0.5rem 0;
-  border-bottom: 1px solid color-mix(in srgb, currentColor 15%, transparent);
-}
-
-.status {
-  margin: 0.5rem 0 0;
-  font-size: 0.875rem;
+/* 欄位並排：窄螢幕自動折成一欄 */
+.fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: var(--mantine-spacing-sm);
+  align-items: end;
 }
 
 /* 趨勢圖：系列色取自類別色票的槽 1（體重）與槽 2（睡眠），深色模式用同色票的深色階 */
@@ -113,6 +21,10 @@ button {
 
 .trend {
   margin: 0 0 1.25rem;
+}
+
+.trend:last-child {
+  margin-bottom: 0;
 }
 
 .trend h3 {
@@ -164,7 +76,7 @@ button {
 /* 圓點外圈 2px 與頁面底色相同，與線或其他點重疊時仍看得清楚 */
 .trend-dot {
   fill: var(--series);
-  stroke: Canvas;
+  stroke: var(--mantine-color-body);
   stroke-width: 2;
 }
 

@@ -1,3 +1,4 @@
+import { Button, Fieldset, Paper, Stack, Text, Textarea, TextInput } from '@mantine/core'
 import { useState, type FormEvent } from 'react'
 import { saveEntry } from '@/data/repository'
 import { MEAL_LABELS, MEAL_TYPES, entrySchema } from '@/domain/entry'
@@ -37,20 +38,19 @@ export function EntryForm({ initial, onDateChange }: Props) {
 
   return (
     <form onSubmit={handleSubmit}>
-      <label>
-        日期
-        <input
+      <Stack gap="sm">
+        <TextInput
+          label="日期"
           type="date"
           required
+          withAsterisk={false}
           value={form.date}
           onChange={(e) => e.target.value && onDateChange(e.target.value)}
         />
-      </label>
 
-      <div className="row">
-        <label>
-          體重（kg）
-          <input
+        <div className="fields">
+          <TextInput
+            label="體重（kg）"
             type="number"
             inputMode="decimal"
             step="0.1"
@@ -58,10 +58,8 @@ export function EntryForm({ initial, onDateChange }: Props) {
             value={form.weightKg}
             onChange={(e) => set('weightKg', e.target.value)}
           />
-        </label>
-        <label>
-          飲水（ml）
-          <input
+          <TextInput
+            label="飲水（ml）"
             type="number"
             inputMode="numeric"
             step="50"
@@ -69,121 +67,118 @@ export function EntryForm({ initial, onDateChange }: Props) {
             value={form.waterMl}
             onChange={(e) => set('waterMl', e.target.value)}
           />
-        </label>
-      </div>
+        </div>
 
-      <div className="row">
-        <label>
-          入睡時間
-          <input
+        <div className="fields">
+          <TextInput
+            label="入睡時間"
             type="time"
             value={form.bedtime}
             onChange={(e) => set('bedtime', e.target.value)}
           />
-        </label>
-        <label>
-          起床時間
-          <input
+          <TextInput
+            label="起床時間"
             type="time"
             value={form.wakeTime}
             onChange={(e) => set('wakeTime', e.target.value)}
           />
-        </label>
-        <label>
-          睡眠品質（1–5）
-          <input
+          <TextInput
+            label="睡眠品質（1–5）"
             type="number"
             min="1"
             max="5"
             value={form.sleepQuality}
             onChange={(e) => set('sleepQuality', e.target.value)}
           />
-        </label>
-      </div>
+        </div>
 
-      {MEAL_TYPES.map((type) => (
-        <label key={type}>
-          {MEAL_LABELS[type]}
-          <textarea
+        {MEAL_TYPES.map((type) => (
+          <Textarea
+            key={type}
+            label={MEAL_LABELS[type]}
             rows={2}
             value={form.meals[type]}
             onChange={(e) => set('meals', { ...form.meals, [type]: e.target.value })}
           />
-        </label>
-      ))}
-
-      <fieldset>
-        <legend>排便</legend>
-        {form.bowel.map((b, i) => (
-          <div className="row" key={i}>
-            <label>
-              時間
-              <input
-                type="time"
-                value={b.time}
-                onChange={(e) => setBowel(i, { time: e.target.value })}
-              />
-            </label>
-            <label>
-              布里斯托（1–7）
-              <input
-                type="number"
-                min="1"
-                max="7"
-                value={b.bristol}
-                onChange={(e) => setBowel(i, { bristol: e.target.value })}
-              />
-            </label>
-            <label>
-              備註
-              <input value={b.note} onChange={(e) => setBowel(i, { note: e.target.value })} />
-            </label>
-            <button
-              type="button"
-              aria-label={`移除第 ${i + 1} 次排便`}
-              onClick={() =>
-                set(
-                  'bowel',
-                  form.bowel.filter((_, j) => j !== i),
-                )
-              }
-            >
-              移除
-            </button>
-          </div>
         ))}
-        <button type="button" onClick={() => set('bowel', [...form.bowel, { ...EMPTY_BOWEL }])}>
-          新增排便
-        </button>
-      </fieldset>
 
-      <label>
-        心情／精神（1–5）
-        <input
+        <Fieldset legend="排便">
+          <Stack gap="sm">
+            {form.bowel.map((b, i) => (
+              <Paper withBorder p="sm" key={i}>
+                <div className="fields">
+                  <TextInput
+                    label="時間"
+                    type="time"
+                    value={b.time}
+                    onChange={(e) => setBowel(i, { time: e.target.value })}
+                  />
+                  <TextInput
+                    label="布里斯托（1–7）"
+                    type="number"
+                    min="1"
+                    max="7"
+                    value={b.bristol}
+                    onChange={(e) => setBowel(i, { bristol: e.target.value })}
+                  />
+                  <TextInput
+                    label="備註"
+                    value={b.note}
+                    onChange={(e) => setBowel(i, { note: e.target.value })}
+                  />
+                  <Button
+                    type="button"
+                    variant="subtle"
+                    color="red"
+                    aria-label={`移除第 ${i + 1} 次排便`}
+                    onClick={() =>
+                      set(
+                        'bowel',
+                        form.bowel.filter((_, j) => j !== i),
+                      )
+                    }
+                  >
+                    移除
+                  </Button>
+                </div>
+              </Paper>
+            ))}
+            <Button
+              type="button"
+              variant="light"
+              onClick={() => set('bowel', [...form.bowel, { ...EMPTY_BOWEL }])}
+            >
+              新增排便
+            </Button>
+          </Stack>
+        </Fieldset>
+
+        <TextInput
+          label="心情／精神（1–5）"
           type="number"
           min="1"
           max="5"
           value={form.mood}
           onChange={(e) => set('mood', e.target.value)}
         />
-      </label>
-      <label>
-        症狀
-        <textarea
+        <Textarea
+          label="症狀"
           rows={2}
           value={form.symptoms}
           onChange={(e) => set('symptoms', e.target.value)}
         />
-      </label>
-      <label>
-        備註
-        <textarea rows={3} value={form.notes} onChange={(e) => set('notes', e.target.value)} />
-      </label>
+        <Textarea
+          label="備註"
+          rows={3}
+          value={form.notes}
+          onChange={(e) => set('notes', e.target.value)}
+        />
 
-      <button type="submit">儲存</button>
-      <p className="status" role="status">
-        {status}
-      </p>
+        <Button type="submit">儲存</Button>
+        <Text role="status" size="sm" c="dimmed">
+          {status}
+        </Text>
+      </Stack>
     </form>
   )
 }

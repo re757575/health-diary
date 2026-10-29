@@ -25,6 +25,8 @@
     "npm": "11.19.1"
   },
   "dependencies": {
+    "@mantine/core": "9.7.4",
+    "@mantine/hooks": "9.7.4",
     "dexie": "4.4.7",
     "dexie-react-hooks": "4.4.0",
     "react": "19.3.1",
