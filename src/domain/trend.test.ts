@@ -197,3 +197,18 @@ describe('buildSymptomTrend', () => {
     expect(trend.items).toHaveLength(1)
   })
 })
+
+describe('buildTrends：體重沿用進區間', () => {
+  it('區間開始前最後一次量的體重，給區間開頭沿用；區間後量的不算', () => {
+    const today = new Date(2026, 9, 28)
+    const trends = buildTrends(
+      [
+        entry('2026-09-01', { weightKg: 72 }),
+        entry('2026-09-20', { weightKg: 71 }),
+        entry('2026-10-10', { weightKg: 70 }),
+      ],
+      today,
+    )
+    expect(trends.weightCarriedIn).toEqual({ kg: 71, measuredOn: '2026-09-20' })
+  })
+})

@@ -9,6 +9,8 @@ export interface ChartBox {
 export interface LineChart {
   /** SVG path 的 d 屬性；沒有資料點時為空字串 */
   path: string
+  /** 沿用模式下沒量的日子（維持上一次的數值）畫成虛線的 path；沒有這種日子時為空字串 */
+  carriedPath: string
   dots: { x: number; y: number; date: string; value: number }[]
   yTicks: { value: number; y: number }[]
   xTicks: { x: number; label: string }[]
@@ -26,11 +28,17 @@ export function buildLineChart({
   startDate,
   days,
   box,
+  carry,
 }: {
   points: TrendPoint[]
   startDate: string
   days: number
   box: ChartBox
+  /**
+   * 沿用模式（體重）：沒量的日子視為維持上一次的數值，畫成水平虛線，到下次量的前一天再接到新的點。
+   * `carriedIn` 是區間開始前最後一次的數值，區間開頭沒量的日子沿用它
+   */
+  carry?: { carriedIn?: number }
 }): LineChart {
   const { top, right, bottom, left } = box.margin
   const innerWidth = box.width - left - right
@@ -42,9 +50,12 @@ export function buildLineChart({
     .reverse()
     .map((dayIndex) => ({ x: xOf(dayIndex), label: labelOf(startDate, dayIndex) }))
 
-  if (points.length === 0) return { path: '', dots: [], yTicks: [], xTicks }
+  const carriedIn = carry?.carriedIn
+  if (points.length === 0 && carriedIn === undefined) {
+    return { path: '', carriedPath: '', dots: [], yTicks: [], xTicks }
+  }
 
-  const values = points.map((p) => p.value)
+  const values = [...points.map((p) => p.value), ...(carriedIn !== undefined ? [carriedIn] : [])]
   const ticks = niceTicks(Math.min(...values), Math.max(...values))
   const yMin = ticks[0]
   const yMax = ticks[ticks.length - 1]
@@ -57,8 +68,36 @@ export function buildLineChart({
     date: p.date,
     value: p.value,
   }))
-  const path = dots.map((d, i) => `${i === 0 ? 'M' : 'L'}${d.x} ${d.y}`).join(' ')
-  return { path, dots, yTicks: ticks.map((value) => ({ value, y: yOf(value) })), xTicks }
+  const yTicks = ticks.map((value) => ({ value, y: yOf(value) }))
+
+  if (!carry) {
+    const path = dots.map((d, i) => `${i === 0 ? 'M' : 'L'}${d.x} ${d.y}`).join(' ')
+    return { path, carriedPath: '', dots, yTicks, xTicks }
+  }
+
+  // 依時間走一遍：上一個值（量的或沿用進來的）維持到下次量的前一天（虛線），再接到新的點（實線）
+  const solid: string[] = []
+  const carried: string[] = []
+  const segment = (from: [number, number], to: [number, number]) =>
+    `M${from[0]} ${from[1]} L${to[0]} ${to[1]}`
+  let previous = carriedIn !== undefined ? { dayIndex: -1, value: carriedIn } : undefined
+  for (const p of points) {
+    if (previous) {
+      // 區間開頭沿用進來的值，從第 0 天開始畫
+      const holdFrom = Math.max(previous.dayIndex, 0)
+      const holdTo = p.dayIndex - 1
+      const y = yOf(previous.value)
+      if (holdTo > holdFrom) carried.push(segment([xOf(holdFrom), y], [xOf(holdTo), y]))
+      if (holdTo >= 0) solid.push(segment([xOf(holdTo), y], [xOf(p.dayIndex), yOf(p.value)]))
+    }
+    previous = p
+  }
+  // 最後一次量之後到區間最後一天，維持最後的數值
+  if (previous && previous.dayIndex < days - 1) {
+    const y = yOf(previous.value)
+    carried.push(segment([xOf(Math.max(previous.dayIndex, 0)), y], [xOf(days - 1), y]))
+  }
+  return { path: solid.join(' '), carriedPath: carried.join(' '), dots, yTicks, xTicks }
 }
 
 /** 起點日期加上 `dayIndex` 天，格式 MM/DD（用 UTC 計算，避開夏令時間） */

@@ -1,5 +1,6 @@
 import { LONG_SLEEP_HOURS, sleepHours, type Entry, type SymptomSeverity } from './entry'
-import { toDateString } from './form'
+import { shiftDate, toDateString } from './form'
+import { weightOn, type DayWeight } from './weight'
 
 export interface TrendPoint {
   date: string
@@ -13,6 +14,8 @@ export interface Trends {
   endDate: string
   days: number
   weight: TrendPoint[]
+  /** 區間開始前最後一次量的體重；區間開頭沒量的日子沿用它（體重沒量視為維持上一次） */
+  weightCarriedIn?: DayWeight
   /** 睡眠時數的點；超過 12 小時的多半是填錯，不收 */
   sleepHours: TrendPoint[]
   /** 因睡眠時數超過 12 小時而沒有列入的日期，由舊到新 */
@@ -88,6 +91,7 @@ export function buildTrends(entries: Entry[], today: Date, days = 30): Trends {
     endDate,
     days,
     weight: toPoints((e) => e.weightKg),
+    weightCarriedIn: weightOn(entries, shiftDate(startDate, -1)),
     sleepHours: toPoints((e) => {
       const hours = sleepHours(e.sleep)
       return hours !== undefined && hours <= LONG_SLEEP_HOURS ? hours : undefined

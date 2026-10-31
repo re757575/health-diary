@@ -89,3 +89,67 @@ describe('niceTicks', () => {
     expect(niceTicks(0.1, 0.4)).toEqual([0.1, 0.2, 0.3, 0.4])
   })
 })
+
+describe('buildLineChart：沿用模式（體重沒量時維持上一次）', () => {
+  // 30 天：x = 30 + dayIndex * 300 / 29；值都相同時刻度 69～71，70 落在 y = 75
+  const point = (dayIndex: number, value = 70) => ({ date: `d${dayIndex}`, dayIndex, value })
+  const xOf = (dayIndex: number) => Math.round((30 + (dayIndex * 300) / 29) * 10) / 10
+
+  it('中間沒量的日子是水平虛線，到下次量的前一天再用實線接到新的點', () => {
+    const chart = buildLineChart({
+      points: [point(10, 70), point(14, 71)],
+      startDate,
+      days: 30,
+      box,
+      carry: {},
+    })
+    const [first, second] = chart.dots
+    expect(chart.carriedPath).toContain(`M${xOf(10)} ${first!.y} L${xOf(13)} ${first!.y}`)
+    expect(chart.path).toBe(`M${xOf(13)} ${first!.y} L${xOf(14)} ${second!.y}`)
+  })
+
+  it('連續兩天都有量就直接實線相連；量到最後一天時沒有虛線', () => {
+    const chart = buildLineChart({
+      points: [point(28), point(29)],
+      startDate,
+      days: 30,
+      box,
+      carry: {},
+    })
+    expect(chart.path).toBe(`M${xOf(28)} 75 L${xOf(29)} 75`)
+    expect(chart.carriedPath).toBe('')
+  })
+
+  it('最後一次量之後到區間最後一天維持原值', () => {
+    const chart = buildLineChart({ points: [point(20)], startDate, days: 30, box, carry: {} })
+    expect(chart.path).toBe('')
+    expect(chart.carriedPath).toBe(`M${xOf(20)} 75 L${xOf(29)} 75`)
+  })
+
+  it('區間開頭沿用區間前的數值；它也算進 y 軸範圍', () => {
+    const chart = buildLineChart({
+      points: [point(5, 70)],
+      startDate,
+      days: 30,
+      box,
+      carry: { carriedIn: 72 },
+    })
+    expect(chart.yTicks.map((t) => t.value)).toEqual([70, 70.5, 71, 71.5, 72])
+    const yCarried = chart.yTicks.at(-1)!.y
+    expect(chart.carriedPath.startsWith(`M${xOf(0)} ${yCarried} L${xOf(4)} ${yCarried}`)).toBe(true)
+    expect(chart.path).toBe(`M${xOf(4)} ${yCarried} L${xOf(5)} ${chart.dots[0]!.y}`)
+  })
+
+  it('區間內都沒量、只有沿用進來的數值：整段虛線，沒有圓點', () => {
+    const chart = buildLineChart({
+      points: [],
+      startDate,
+      days: 30,
+      box,
+      carry: { carriedIn: 70 },
+    })
+    expect(chart.dots).toEqual([])
+    expect(chart.path).toBe('')
+    expect(chart.carriedPath).toBe(`M${xOf(0)} 75 L${xOf(29)} 75`)
+  })
+})

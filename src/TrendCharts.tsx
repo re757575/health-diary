@@ -20,6 +20,7 @@ import {
   type SymptomTrend,
   type TrendPoint,
 } from '@/domain/trend'
+import type { DayWeight } from '@/domain/weight'
 import { Section } from './Section'
 
 interface Props {
@@ -68,6 +69,11 @@ interface ChartProps {
   startDate: string
   /** 圖下方的補充說明，例如有資料因疑似填錯而沒列入 */
   note?: string
+  /**
+   * 沿用模式（體重）：沒量的日子維持上一次的數值，畫成水平虛線。
+   * `carriedIn` 是區間開始前最後一次量的數值，區間內都沒量時整段沿用它
+   */
+  carry?: { carriedIn?: DayWeight }
 }
 
 function TrendChart({
@@ -80,10 +86,11 @@ function TrendChart({
   points,
   startDate,
   note,
+  carry,
 }: ChartProps) {
   const headingId = useId()
 
-  if (points.length === 0) {
+  if (points.length === 0 && !carry?.carriedIn) {
     return (
       <figure className="trend" aria-labelledby={headingId}>
         <h3 id={headingId}>{title}</h3>
@@ -94,14 +101,22 @@ function TrendChart({
   }
 
   const summary = summarizeSeries(points)
-  const chart = buildLineChart({ points, startDate, days: DAYS, box: BOX })
+  const chart = buildLineChart({
+    points,
+    startDate,
+    days: DAYS,
+    box: BOX,
+    carry: carry && { carriedIn: carry.carriedIn?.kg },
+  })
   const { right, bottom, left } = BOX.margin
   const plotBottom = BOX.height - bottom
   const plotRight = BOX.width - right
 
-  const summarySegments = [
-    `最新 ${summary.latest!.value} ${unit}（${shortDate(summary.latest!.date)}）`,
-  ]
+  const carriedIn = carry?.carriedIn
+  const summarySegments = summary.latest
+    ? [`最新 ${summary.latest.value} ${unit}（${shortDate(summary.latest.date)}）`]
+    : // 區間內都沒量，只有沿用進來的數值
+      [`沒有量，維持 ${shortDate(carriedIn!.measuredOn)} 的 ${carriedIn!.kg} ${unit}`]
   if (summary.change !== undefined) {
     summarySegments.push(`區間變化 ${formatChange(summary.change, unit)}`)
     summarySegments.push(`平均 ${summary.average} ${unit}`)
@@ -122,7 +137,10 @@ function TrendChart({
 
       <svg
         role="img"
-        aria-label={`${title}折線圖，共 ${points.length} 筆紀錄`}
+        aria-label={
+          `${title}折線圖，共 ${points.length} 筆紀錄` +
+          (chart.carriedPath ? '；虛線是沒量、維持上一次數值的日子' : '')
+        }
         viewBox={`0 0 ${BOX.width} ${BOX.height}`}
       >
         {/* 格線與刻度：一像素、實線、不搶資料的注意力 */}
@@ -146,7 +164,11 @@ function TrendChart({
           </text>
         ))}
 
-        {points.length > 1 && <path className="trend-line" d={chart.path} />}
+        {/* 一般模式只有一個點時不畫線；沿用模式的實線只連到實際量的點，有才畫 */}
+        {(carry ? chart.path : points.length > 1) && <path className="trend-line" d={chart.path} />}
+        {chart.carriedPath && (
+          <path className="trend-line trend-line-carried" d={chart.carriedPath} />
+        )}
         {chart.dots.map((dot) => (
           <g key={dot.date}>
             <circle className="trend-dot" cx={dot.x} cy={dot.y} r={4} />
@@ -157,25 +179,33 @@ function TrendChart({
         ))}
       </svg>
 
-      <details>
-        <summary>檢視資料表</summary>
-        <table aria-label={`${subject}資料表`}>
-          <thead>
-            <tr>
-              <th scope="col">日期</th>
-              <th scope="col">{valueHeader}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {points.map((p) => (
-              <tr key={p.date}>
-                <td>{p.date}</td>
-                <td>{`${p.value} ${unit}`}</td>
+      {chart.carriedPath && (
+        <p className="trend-note">
+          <span className="trend-legend-carried" aria-hidden="true" />
+          虛線：沒量的日子，維持上一次量的數值
+        </p>
+      )}
+      {points.length > 0 && (
+        <details>
+          <summary>檢視資料表</summary>
+          <table aria-label={`${subject}資料表`}>
+            <thead>
+              <tr>
+                <th scope="col">日期</th>
+                <th scope="col">{valueHeader}</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </details>
+            </thead>
+            <tbody>
+              {points.map((p) => (
+                <tr key={p.date}>
+                  <td>{p.date}</td>
+                  <td>{`${p.value} ${unit}`}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </details>
+      )}
       {note && <p className="trend-note">{note}</p>}
     </figure>
   )
@@ -439,6 +469,7 @@ export function TrendCharts({ entries, today }: Props) {
         seriesClass="series-weight"
         points={trends.weight}
         startDate={trends.startDate}
+        carry={{ carriedIn: trends.weightCarriedIn }}
       />
       <TrendChart
         title="睡眠時數趨勢"

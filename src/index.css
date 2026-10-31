@@ -139,6 +139,22 @@ textarea.mantine-Textarea-input {
   stroke-linejoin: round;
 }
 
+/* 沒量、沿用上一次數值的日子：同色虛線，看得出是維持而不是實際量到的 */
+.trend-line-carried {
+  stroke-dasharray: 4 4;
+  stroke-opacity: 0.7;
+}
+
+/* 圖例裡的虛線樣本，和圖上的虛線同色同樣式 */
+.trend-legend-carried {
+  display: inline-block;
+  width: 1.5rem;
+  margin-right: 0.375rem;
+  vertical-align: middle;
+  border-top: 2px dashed var(--series);
+  opacity: 0.7;
+}
+
 /* 圓點外圈 2px 與頁面底色相同，與線或其他點重疊時仍看得清楚 */
 .trend-dot {
   fill: var(--series);

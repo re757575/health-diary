@@ -54,7 +54,12 @@ describe('TrendCharts：有資料', () => {
   it('每張圖都有給輔助科技的文字名稱，不只靠顏色與形狀', () => {
     render(<TrendCharts entries={entries} today={today} />)
 
-    expect(screen.getByRole('img', { name: '體重趨勢折線圖，共 2 筆紀錄' })).toBeInTheDocument()
+    // 體重在 10/10 與 10/28 之間沒量，沿用的日子是虛線，名稱也要說明
+    expect(
+      screen.getByRole('img', {
+        name: '體重趨勢折線圖，共 2 筆紀錄；虛線是沒量、維持上一次數值的日子',
+      }),
+    ).toBeInTheDocument()
     expect(screen.getByRole('img', { name: '睡眠時數趨勢折線圖，共 2 筆紀錄' })).toBeInTheDocument()
   })
 
@@ -87,10 +92,24 @@ describe('TrendCharts：沒有資料', () => {
     expect(screen.queryByRole('img')).not.toBeInTheDocument()
   })
 
-  it('區間外的紀錄不算：只有 31 天前的體重仍顯示空狀態', () => {
+  it('最近 30 天沒量、但更早量過體重：整段畫成虛線，維持那次的數值', () => {
     render(<TrendCharts entries={[entry('2026-09-28', { weightKg: 80 })]} today={today} />)
 
-    expect(screen.getByText('最近 30 天還沒有體重紀錄')).toBeInTheDocument()
+    const figure = screen.getByRole('figure', { name: '體重趨勢' })
+    expect(figure).toHaveTextContent('沒有量，維持 09/28 的 80 kg')
+    expect(figure).toHaveTextContent('虛線：沒量的日子，維持上一次量的數值')
+    expect(within(figure).queryByRole('table')).not.toBeInTheDocument()
+  })
+
+  it('睡眠不沿用：只有 31 天前的睡眠仍顯示空狀態', () => {
+    render(
+      <TrendCharts
+        entries={[entry('2026-09-28', { sleep: { bedtime: '23:00', wakeTime: '07:00' } })]}
+        today={today}
+      />,
+    )
+
+    expect(screen.getByText('最近 30 天還沒有睡眠紀錄（需要填入睡與起床時間）')).toBeInTheDocument()
   })
 })
 
@@ -274,5 +293,28 @@ describe('TrendCharts：睡眠超過 12 小時', () => {
     expect(screen.getByRole('figure', { name: '睡眠時數趨勢' })).not.toHaveTextContent(
       '超過 12 小時',
     )
+  })
+})
+
+describe('TrendCharts：體重沿用', () => {
+  it('每天都有量、量到今天時，沒有虛線也沒有圖例', () => {
+    render(
+      <TrendCharts
+        entries={[entry('2026-10-27', { weightKg: 70 }), entry('2026-10-28', { weightKg: 69.8 })]}
+        today={today}
+      />,
+    )
+
+    const figure = screen.getByRole('figure', { name: '體重趨勢' })
+    expect(figure).not.toHaveTextContent('虛線')
+    expect(figure.querySelector('.trend-line-carried')).toBeNull()
+  })
+
+  it('沒量的日子畫成虛線並加上圖例', () => {
+    render(<TrendCharts entries={[entry('2026-10-20', { weightKg: 70 })]} today={today} />)
+
+    const figure = screen.getByRole('figure', { name: '體重趨勢' })
+    expect(figure).toHaveTextContent('虛線：沒量的日子，維持上一次量的數值')
+    expect(figure.querySelector('.trend-line-carried')).not.toBeNull()
   })
 })
