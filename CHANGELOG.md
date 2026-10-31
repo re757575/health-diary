@@ -2,6 +2,11 @@
 
 本檔案由 [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) 依照 [Conventional Commits](https://www.conventionalcommits.org/) 規範的 commit 訊息自動產生，請勿手動編輯內容，執行 `npm run release` 即可更新。
 
+## [0.1.9](https://github.com/re757575/health-diary/compare/v0.1.8...v0.1.9) (2026-10-31)
+
+### Features
+
+* **trend:** 體重趨勢圖用虛線畫出沒量、維持上一次數值的日子 ([d7b428e](https://github.com/re757575/health-diary/commit/d7b428eef764b960a84b7abdc17e4d5d87511f42))
 ## [0.1.8](https://github.com/re757575/health-diary/compare/v0.1.7...v0.1.8) (2026-10-31)
 
 ### Features
