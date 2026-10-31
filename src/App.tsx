@@ -1,6 +1,6 @@
 import { Badge, Button, Container, Divider, Group, Stack, Tabs, Text, Title } from '@mantine/core'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { Fragment, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import { getEntry, getProfile, listEntries } from '@/data/repository'
 import { emptyForm, entryToForm, toDateString } from '@/domain/form'
 import { sleepHours } from '@/domain/entry'
@@ -30,6 +30,28 @@ export default function App() {
   const tagNames = useMemo(() => collectTagNames(history ?? []), [history])
   // 同樣包一層物件區分「載入中」與「尚未填寫」
   const profile = useLiveQuery(async () => ({ value: await getProfile() }), [])
+  // 每日紀錄表單是否有未儲存的修改
+  const [dirty, setDirty] = useState(false)
+
+  // 有未儲存的修改時，關閉或重新整理頁面前由瀏覽器詢問（iOS Safari 不支援，只能靠切換日期時的提醒）
+  useEffect(() => {
+    if (!dirty) return
+    const warn = (event: BeforeUnloadEvent) => event.preventDefault()
+    window.addEventListener('beforeunload', warn)
+    return () => window.removeEventListener('beforeunload', warn)
+  }, [dirty])
+
+  /** 換一天編輯；表單是每天重新載入的，有未儲存的修改要先確認，回傳是否真的換了 */
+  function changeDate(next: string): boolean {
+    if (next === date) return true
+    if (dirty && !window.confirm(`${date} 有尚未儲存的修改，切換日期後會遺失。確定要切換嗎？`)) {
+      return false
+    }
+    setDate(next)
+    // 修改隨著舊的表單一起捨棄；新的那天載入後表單會再回報
+    setDirty(false)
+    return true
+  }
 
   // 各分頁共用同一個捲動位置，切換時回到頂端，不要停在上一頁的中段
   function changeTab(next: TabValue) {
@@ -39,8 +61,7 @@ export default function App() {
 
   // 歷史紀錄在「趨勢」，編輯表單在「今天」，所以選一天來編輯時要切過去
   function editDate(next: string) {
-    setDate(next)
-    changeTab('today')
+    if (changeDate(next)) changeTab('today')
   }
 
   return (
@@ -62,7 +83,7 @@ export default function App() {
               <MissingNotice
                 days={findIncompleteDays(history, new Date())}
                 currentDate={date}
-                onFill={setDate}
+                onFill={changeDate}
               />
             )}
             <Section title="每日紀錄">
@@ -70,7 +91,8 @@ export default function App() {
                 <EntryForm
                   key={date}
                   initial={loaded.entry ? entryToForm(loaded.entry) : emptyForm(date)}
-                  onDateChange={setDate}
+                  onDateChange={changeDate}
+                  onDirtyChange={setDirty}
                   knownSymptoms={symptomNames}
                   knownTags={tagNames}
                 />

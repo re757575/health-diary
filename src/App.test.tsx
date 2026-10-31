@@ -210,6 +210,86 @@ describe('切換日期', () => {
     await waitFor(() => expect(screen.getByLabelText('日期')).toHaveValue(today))
     expect(screen.getByLabelText('體重（kg）')).toHaveValue(70)
   })
+
+  describe('有未儲存的修改時', () => {
+    const today = toDateString(new Date())
+    const yesterday = shiftDate(today, -1)
+
+    it('切換前先確認；取消就留在原本那天，輸入還在', async () => {
+      const user = userEvent.setup()
+      const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
+      render(<App />)
+
+      await user.type(await screen.findByLabelText('體重（kg）'), '70')
+      await user.click(screen.getByRole('button', { name: '前一天' }))
+
+      expect(confirm).toHaveBeenCalledWith(expect.stringContaining(`${today} 有尚未儲存的修改`))
+      expect(screen.getByLabelText('日期')).toHaveValue(today)
+      expect(screen.getByLabelText('體重（kg）')).toHaveValue(70)
+      confirm.mockRestore()
+    })
+
+    it('確認後才切換，沒儲存的輸入不會寫入', async () => {
+      const user = userEvent.setup()
+      const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true)
+      render(<App />)
+
+      await user.type(await screen.findByLabelText('體重（kg）'), '70')
+      await user.click(screen.getByRole('button', { name: '前一天' }))
+
+      await waitFor(() => expect(screen.getByLabelText('日期')).toHaveValue(yesterday))
+      expect(screen.getByLabelText('體重（kg）')).toHaveValue(null)
+      expect(await db.entries.count()).toBe(0)
+      confirm.mockRestore()
+    })
+
+    it('從歷史紀錄按「編輯」時也要確認，取消就不切到那一天', async () => {
+      const user = userEvent.setup()
+      const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
+      await db.entries.put({ date: '2026-01-02', weightKg: 65, meals: [], bowel: [] })
+      render(<App />)
+
+      await user.type(await screen.findByLabelText('早餐'), '燕麥奶')
+      await openTab(user, '趨勢')
+      await user.click(await screen.findByRole('button', { name: '編輯 2026-01-02' }))
+
+      expect(confirm).toHaveBeenCalled()
+      expect(screen.getByRole('tab', { name: '趨勢' })).toHaveAttribute('aria-selected', 'true')
+      await openTab(user, '今天')
+      expect(screen.getByLabelText('日期')).toHaveValue(today)
+      expect(screen.getByLabelText('早餐')).toHaveValue('燕麥奶')
+      confirm.mockRestore()
+    })
+
+    it('儲存後切換日期不用確認', async () => {
+      const user = userEvent.setup()
+      const confirm = vi.spyOn(window, 'confirm')
+      render(<App />)
+
+      await user.type(await screen.findByLabelText('體重（kg）'), '70')
+      await user.click(screen.getByRole('button', { name: '儲存' }))
+      await screen.findByText(`已儲存 ${today} 的紀錄`)
+      await user.click(screen.getByRole('button', { name: '前一天' }))
+
+      await waitFor(() => expect(screen.getByLabelText('日期')).toHaveValue(yesterday))
+      expect(confirm).not.toHaveBeenCalled()
+      confirm.mockRestore()
+    })
+
+    it('關閉或重新整理頁面前，瀏覽器會詢問', async () => {
+      const user = userEvent.setup()
+      render(<App />)
+
+      const before = new Event('beforeunload', { cancelable: true })
+      window.dispatchEvent(before)
+      expect(before.defaultPrevented).toBe(false)
+
+      await user.type(await screen.findByLabelText('體重（kg）'), '70')
+      const after = new Event('beforeunload', { cancelable: true })
+      window.dispatchEvent(after)
+      expect(after.defaultPrevented).toBe(true)
+    })
+  })
 })
 
 describe('趨勢圖', () => {

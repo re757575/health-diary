@@ -118,6 +118,14 @@ export function formToEntry(form: FormValues): Entry {
   }
 }
 
+/**
+ * 兩份表單存成紀錄後是否相同，用來判斷有沒有未儲存的修改。
+ * 以存檔後的內容比較：只差前後空白、或多了全空的排便列，都算沒有修改
+ */
+export function isSameEntry(a: FormValues, b: FormValues): boolean {
+  return JSON.stringify(formToEntry(a)) === JSON.stringify(formToEntry(b))
+}
+
 /** Entry → 表單，用於編輯既有紀錄 */
 export function entryToForm(entry: Entry): FormValues {
   const form = emptyForm(entry.date)

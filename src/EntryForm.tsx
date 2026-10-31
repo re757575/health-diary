@@ -9,7 +9,7 @@ import {
   Textarea,
   TextInput,
 } from '@mantine/core'
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { getEntry, saveEntry } from '@/data/repository'
 import {
   BRISTOL_DESCRIPTIONS,
@@ -28,6 +28,7 @@ import {
   entryToForm,
   fillEmptyMeals,
   formToEntry,
+  isSameEntry,
   shiftDate,
   type BowelFormValues,
   type FormValues,
@@ -45,6 +46,8 @@ interface Props {
   initial: FormValues
   /** 使用者改選日期時通知上層載入該日的紀錄 */
   onDateChange: (date: string) => void
+  /** 是否有未儲存的修改，變動時通知上層（切換日期或關閉頁面前提醒用） */
+  onDirtyChange?: (dirty: boolean) => void
   /** 症狀選擇器的候選清單（預設症狀加上過去用過的）；沒給就只有預設症狀 */
   knownSymptoms?: readonly string[]
   /** 狀況標籤的候選清單；沒給就只有預設標籤 */
@@ -65,6 +68,7 @@ const EMPTY_BOWEL: BowelFormValues = { time: '', bristol: '', note: '' }
 export function EntryForm({
   initial,
   onDateChange,
+  onDirtyChange,
   knownSymptoms = PRESET_SYMPTOMS,
   knownTags = PRESET_TAGS,
 }: Props) {
@@ -80,6 +84,13 @@ export function EntryForm({
   const isLongSleep = hours !== undefined && hours > LONG_SLEEP_HOURS
   const sleepKey = `${form.bedtime}|${form.wakeTime}`
   const sleepConfirmed = confirmedSleep === sleepKey
+
+  // initial 在儲存後會由上層換成剛存的內容，所以存檔後就不再算有修改
+  const dirty = !isSameEntry(initial, form)
+  // 不在 cleanup 清掉：切到別的分頁時 Tabs 會用 <Activity> 隱藏這裡並執行 cleanup，但修改還在
+  useEffect(() => {
+    onDirtyChange?.(dirty)
+  }, [dirty, onDirtyChange])
 
   const set = <K extends keyof FormValues>(key: K, value: FormValues[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }))

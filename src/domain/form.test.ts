@@ -6,6 +6,7 @@ import {
   entryToForm,
   fillEmptyMeals,
   formToEntry,
+  isSameEntry,
   shiftDate,
   toDateString,
   toTimeString,
@@ -156,5 +157,29 @@ describe('entryToForm', () => {
       notes: '早起運動',
     })
     expect(formToEntry(entryToForm(entry))).toEqual(entry)
+  })
+})
+
+describe('isSameEntry', () => {
+  const base = emptyForm('2026-10-28')
+
+  it('改了任何會存下來的內容就不同', () => {
+    expect(isSameEntry(base, { ...base, weightKg: '70' })).toBe(false)
+    expect(isSameEntry(base, { ...base, meals: { ...base.meals, lunch: '便當' } })).toBe(false)
+    expect(isSameEntry(base, { ...base, symptomItems: [{ name: '頭痛', severity: 1 }] })).toBe(
+      false,
+    )
+  })
+
+  it('只差前後空白或多了全空的排便列，存起來一樣，算沒有修改', () => {
+    const saved = { ...base, notes: '早起' }
+    expect(isSameEntry(saved, { ...saved, notes: '早起  ' })).toBe(true)
+    expect(isSameEntry(saved, { ...saved, bowel: [{ time: '', bristol: '', note: '' }] })).toBe(
+      true,
+    )
+  })
+
+  it('改了又改回原值算沒有修改', () => {
+    expect(isSameEntry(base, { ...base, weightKg: '' })).toBe(true)
   })
 })
