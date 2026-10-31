@@ -2,6 +2,20 @@
 
 本檔案由 [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) 依照 [Conventional Commits](https://www.conventionalcommits.org/) 規範的 commit 訊息自動產生，請勿手動編輯內容，執行 `npm run release` 即可更新。
 
+## [0.1.6](https://github.com/re757575/health-diary/compare/v0.1.5...v0.1.6) (2026-10-31)
+
+### Features
+
+* **backup:** 太久沒備份時在今天分頁提醒並可一鍵匯出 ([63c1584](https://github.com/re757575/health-diary/commit/63c1584f6837d949f57def0c60dc992149f6fbfa))
+* **backup:** 匯入會覆蓋內容不同的紀錄時先請使用者確認 ([a4a6599](https://github.com/re757575/health-diary/commit/a4a659924e06342d7f80f291e9a7c7952f3e4bfa))
+* **entry:** 切換日期或關閉頁面前提醒尚未儲存的修改 ([19ae56c](https://github.com/re757575/health-diary/commit/19ae56ced775ddba2c59f80b270e3f767cb11107))
+* **entry:** 新增「當天沒有排便」，AI 提示詞區分沒排便與沒填 ([07fd861](https://github.com/re757575/health-diary/commit/07fd861095c6b5639526389780155a290f4fe170))
+* **history:** 歷史紀錄可刪除某天的紀錄並復原 ([733d620](https://github.com/re757575/health-diary/commit/733d6205dd80be4a8e01651abd45517aa6df8d59))
+* **pwa:** 支援安裝到主畫面與離線使用，並請求持久保存資料 ([3c424f8](https://github.com/re757575/health-diary/commit/3c424f8fa829eb739b0f50c9228222efb991484d))
+
+### Bug Fixes
+
+* **entry:** 跨過午夜回到 App 時切換到新的一天 ([ce3cb82](https://github.com/re757575/health-diary/commit/ce3cb821228669b81090867f25e1b09c2a5d4ad4))
 ## [0.1.5](https://github.com/re757575/health-diary/compare/v0.1.4...v0.1.5) (2026-10-31)
 
 ### Features
