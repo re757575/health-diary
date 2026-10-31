@@ -2,6 +2,15 @@
 
 本檔案由 [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) 依照 [Conventional Commits](https://www.conventionalcommits.org/) 規範的 commit 訊息自動產生，請勿手動編輯內容，執行 `npm run release` 即可更新。
 
+## [0.1.11](https://github.com/re757575/health-diary/compare/v0.1.10...v0.1.11) (2026-10-31)
+
+### Features
+
+* **entry:** 沒儲存的輸入隨時存成草稿，重新開啟時自動還原 ([34462b6](https://github.com/re757575/health-diary/commit/34462b63b2bc852c9be6e2a1afa4254407a9dbad))
+
+### Bug Fixes
+
+* 讀寫資料庫失敗時顯示錯誤訊息，不再按了沒反應 ([d8c257d](https://github.com/re757575/health-diary/commit/d8c257d4dfd02d82f1a6f16ada22a13def4fb09c))
 ## [0.1.10](https://github.com/re757575/health-diary/compare/v0.1.9...v0.1.10) (2026-10-31)
 
 ### Features
