@@ -575,3 +575,71 @@ describe('EntryForm：當天沒有排便', () => {
     expect(entry?.bowel).toHaveLength(1)
   })
 })
+
+describe('EntryForm：體重可能打錯', () => {
+  const previousWeight = { kg: 70, measuredOn: '2026-10-27' }
+  const renderWithPrevious = (initial = emptyForm(DATE)) =>
+    render(<EntryForm initial={initial} onDateChange={() => {}} previousWeight={previousWeight} />)
+
+  it('和上次差很多時即時提示；第一次儲存不寫入，確認後再按才存', async () => {
+    const user = userEvent.setup()
+    renderWithPrevious()
+
+    await user.type(screen.getByLabelText('體重（kg）'), '700')
+    expect(
+      screen.getByText('體重 700 kg 和上次（10/27 的 70 kg）差很多，是不是打錯了？'),
+    ).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: '儲存' }))
+    expect(await screen.findByText(/請確認是否打錯；沒問題請再按一次儲存/)).toBeInTheDocument()
+    expect(await getEntry(DATE)).toBeUndefined()
+
+    await user.click(screen.getByRole('button', { name: '體重 700 kg 無誤，儲存' }))
+    await screen.findByText(`已儲存 ${DATE} 的紀錄`)
+    expect((await getEntry(DATE))?.weightKg).toBe(700)
+  })
+
+  it('一般的起伏不提示，一次就存', async () => {
+    const user = userEvent.setup()
+    renderWithPrevious()
+
+    await user.type(screen.getByLabelText('體重（kg）'), '71.5')
+    await user.click(screen.getByRole('button', { name: '儲存' }))
+
+    await screen.findByText(`已儲存 ${DATE} 的紀錄`)
+    expect(screen.queryByText(/是不是打錯了/)).not.toBeInTheDocument()
+  })
+
+  it('確認過之後又改成另一個可疑的數值，要重新確認', async () => {
+    const user = userEvent.setup()
+    renderWithPrevious()
+    const weight = screen.getByLabelText('體重（kg）')
+
+    await user.type(weight, '700')
+    await user.click(screen.getByRole('button', { name: '儲存' }))
+    await user.clear(weight)
+    await user.type(weight, '7')
+
+    expect(screen.getByRole('button', { name: '儲存' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: '儲存' }))
+    expect(await getEntry(DATE)).toBeUndefined()
+  })
+
+  it('之前就存下來的數值沒改的話，存其他欄位不用再確認', async () => {
+    const user = userEvent.setup()
+    renderWithPrevious({ ...emptyForm(DATE), weightKg: '700' })
+
+    await user.type(screen.getByLabelText('早餐'), '燕麥')
+    await user.click(screen.getByRole('button', { name: '儲存' }))
+
+    await screen.findByText(`已儲存 ${DATE} 的紀錄`)
+  })
+
+  it('沒有上次的體重可以比較時，不在合理範圍才提示', async () => {
+    const user = userEvent.setup()
+    renderForm()
+
+    await user.type(screen.getByLabelText('體重（kg）'), '7')
+    expect(screen.getByText('體重 7 kg 不太像正常的數值，是不是打錯了？')).toBeInTheDocument()
+  })
+})

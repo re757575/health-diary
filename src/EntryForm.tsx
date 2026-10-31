@@ -40,7 +40,7 @@ import { Status } from './Status'
 import { TimeField } from './TimeField'
 import { PRESET_SYMPTOMS } from '@/domain/symptom'
 import { PRESET_TAGS } from '@/domain/tag'
-import type { DayWeight } from '@/domain/weight'
+import { isSuspectWeight, type DayWeight } from '@/domain/weight'
 import { useStatus } from './useStatus'
 
 interface Props {
@@ -96,6 +96,23 @@ export function EntryForm({
   const sleepKey = `${form.bedtime}|${form.wakeTime}`
   const sleepConfirmed = confirmedSleep === sleepKey
 
+  // 體重和上次差太多（或不在合理範圍）多半是打錯，儲存前也要確認；只檢查這次有改的數值，
+  // 之前確認過存下來的不用每次存檔都再問。confirmedWeight 是使用者已確認的數值，一改就不算數
+  const [confirmedWeight, setConfirmedWeight] = useState<string | null>(null)
+  const weightKg = form.weightKg.trim() === '' ? undefined : Number(form.weightKg)
+  const isOddWeight =
+    weightKg !== undefined &&
+    weightKg > 0 &&
+    form.weightKg !== initial.weightKg &&
+    isSuspectWeight(weightKg, previousWeight?.kg)
+  const weightConfirmed = confirmedWeight === form.weightKg
+  const weightWarning =
+    isOddWeight &&
+    (previousWeight
+      ? `體重 ${weightKg} kg 和上次（${previousWeight.measuredOn.slice(5).replace('-', '/')} 的 ${previousWeight.kg} kg）差很多`
+      : `體重 ${weightKg} kg 不太像正常的數值`)
+  const pendingConfirm = (isLongSleep && sleepConfirmed) || (isOddWeight && weightConfirmed)
+
   // initial 在儲存後會由上層換成剛存的內容，所以存檔後就不再算有修改
   const dirty = !isSameEntry(initial, form)
   // 不在 cleanup 清掉：切到別的分頁時 Tabs 會用 <Activity> 隱藏這裡並執行 cleanup，但修改還在
@@ -135,13 +152,30 @@ export function EntryForm({
       setStatus('有欄位格式不正確，請檢查後再儲存', true)
       return
     }
-    if (isLongSleep && !sleepConfirmed) {
-      setConfirmedSleep(sleepKey)
-      setStatus(`睡眠 ${hours} 小時，請確認入睡與起床時間；沒問題請再按一次儲存`, true)
+    const needSleep = isLongSleep && !sleepConfirmed
+    const needWeight = isOddWeight && !weightConfirmed
+    if (needSleep || needWeight) {
+      if (needSleep) setConfirmedSleep(sleepKey)
+      if (needWeight) setConfirmedWeight(form.weightKg)
+      const reasons = [
+        needSleep && `睡眠 ${hours} 小時，請確認入睡與起床時間`,
+        needWeight && `${weightWarning}，請確認是否打錯`,
+      ].filter(Boolean)
+      setStatus(`${reasons.join('；')}；沒問題請再按一次儲存`, true)
       return
     }
     await saveEntry(parsed.data)
     setStatus(`已儲存 ${parsed.data.date} 的紀錄`)
+  }
+
+  /** 有看過警告、待確認的數值時，按鈕寫出要確認的是什麼 */
+  function saveLabel(): string {
+    const sleep = isLongSleep && sleepConfirmed
+    const weight = isOddWeight && weightConfirmed
+    if (sleep && weight) return '睡眠與體重確認無誤，儲存'
+    if (sleep) return `睡眠 ${hours} 小時無誤，儲存`
+    if (weight) return `體重 ${weightKg} kg 無誤，儲存`
+    return '儲存'
   }
 
   return (
@@ -228,6 +262,12 @@ export function EntryForm({
             onChange={(e) => set('exerciseMinutes', e.target.value)}
           />
         </div>
+        {/* 放在欄位格線外：放在格內會撐高那一格，旁邊的欄位就對不齊了 */}
+        {weightWarning && (
+          <Text size="sm" c="orange.8" aria-live="polite">
+            {weightWarning}，是不是打錯了？
+          </Text>
+        )}
 
         <Divider
           label="睡眠"
@@ -405,12 +445,8 @@ export function EntryForm({
 
       {/* 固定在畫面底部：表單很長，儲存按鈕與結果訊息隨時看得到 */}
       <div className="save-bar">
-        <Button
-          type="submit"
-          fullWidth
-          color={isLongSleep && sleepConfirmed ? 'orange' : undefined}
-        >
-          {isLongSleep && sleepConfirmed ? `睡眠 ${hours} 小時無誤，儲存` : '儲存'}
+        <Button type="submit" fullWidth color={pendingConfirm ? 'orange' : undefined}>
+          {saveLabel()}
         </Button>
         <Status status={status} />
       </div>

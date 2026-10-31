@@ -3,7 +3,7 @@ import { MEAL_LABELS, SEVERITY_LABELS, sleepHours, type Entry } from './entry'
 import { SEX_LABELS, ageOn, type Profile } from './profile'
 import { toDateString } from './form'
 import { findLongSleeps, missingFields } from './quality'
-import { weightOn } from './weight'
+import { findSuspectWeights, weightOn } from './weight'
 
 const INSTRUCTIONS = `你是一位細心的健康數據分析助理。以下是我的每日飲食與健康紀錄，請協助分析：
 
@@ -95,6 +95,13 @@ function formatQuality(entries: Entry[], history: Entry[], today: Date): string 
     lines.push(
       `- 疑似填錯：${s.date} 睡眠 ${s.hours} 小時（${s.bedtime} 入睡、${s.wakeTime} 起床），可能是上午／下午填反`,
     )
+  }
+
+  for (const w of findSuspectWeights(entries, history)) {
+    const basis = w.previous
+      ? `前一次 ${w.previous.measuredOn} 是 ${w.previous.kg} kg`
+      : '不在一般體重的範圍'
+    lines.push(`- 疑似填錯：${w.date} 體重 ${w.kg} kg（${basis}），可能是打錯`)
   }
 
   const todayDate = toDateString(today)

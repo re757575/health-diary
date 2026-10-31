@@ -207,3 +207,21 @@ describe('體重沿用之前的數值', () => {
     )
   })
 })
+
+describe('資料品質備註：可能打錯的體重', () => {
+  it('和前一次差超過 10% 的體重標為疑似填錯，前一次可以在分析期間之外', () => {
+    const history = [entry('2026-09-01', { weightKg: 70 }), entry('2026-10-28', { weightKg: 700 })]
+    const prompt = buildAnalysisPrompt([history[1]!], { history, today: new Date(2026, 9, 31) })
+    expect(prompt).toContain(
+      '- 疑似填錯：2026-10-28 體重 700 kg（前一次 2026-09-01 是 70 kg），可能是打錯',
+    )
+  })
+
+  it('一般的起伏不標', () => {
+    const prompt = buildAnalysisPrompt(
+      [entry('2026-10-27', { weightKg: 70 }), entry('2026-10-28', { weightKg: 71.5 })],
+      { today: new Date(2026, 9, 31) },
+    )
+    expect(prompt).not.toContain('體重 71.5 kg（')
+  })
+})
