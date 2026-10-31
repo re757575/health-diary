@@ -1,7 +1,14 @@
 import { Fragment, useId } from 'react'
 import { buildLineChart, type ChartBox } from '@/domain/chart-scale'
 import type { Entry } from '@/domain/entry'
-import { buildTrends, summarizeSeries, type TrendPoint } from '@/domain/trend'
+import { SEVERITY_LABELS, SYMPTOM_SEVERITIES } from '@/domain/entry'
+import {
+  buildSymptomTrend,
+  buildTrends,
+  summarizeSeries,
+  type SymptomTrend,
+  type TrendPoint,
+} from '@/domain/trend'
 import { Section } from './Section'
 
 interface Props {
@@ -151,8 +158,55 @@ function TrendChart({
   )
 }
 
+function SymptomChart({ trend }: { trend: SymptomTrend }) {
+  const headingId = useId()
+  const { recordedDays, textOnlyDays, items } = trend
+
+  return (
+    <figure className="trend series-symptom" aria-labelledby={headingId}>
+      <h3 id={headingId}>症狀出現天數</h3>
+      <p>
+        最近 {DAYS} 天有 {recordedDays} 天有紀錄
+      </p>
+      {items.length === 0 ? (
+        <p>最近 {DAYS} 天還沒有點選記錄的症狀</p>
+      ) : (
+        <>
+          <ul className="symptom-bars">
+            {items.map((item) => (
+              <li key={item.name}>
+                <span className="symptom-name">{item.name}</span>
+                {/* 長條只是把右邊的文字畫出來，不重複給讀屏軟體 */}
+                <span className="symptom-track" aria-hidden="true">
+                  {SYMPTOM_SEVERITIES.map((severity) => (
+                    <span
+                      key={severity}
+                      className={`symptom-seg symptom-seg-${severity}`}
+                      style={{ width: `${(item.bySeverity[severity] / recordedDays) * 100}%` }}
+                    />
+                  ))}
+                </span>
+                <span className="symptom-count">
+                  {`${item.days} 天（${SYMPTOM_SEVERITIES.filter((s) => item.bySeverity[s] > 0)
+                    .map((s) => `${SEVERITY_LABELS[s]} ${item.bySeverity[s]}`)
+                    .join(' · ')}）`}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <p className="trend-note">長條顏色由淺到深是輕、中、重</p>
+        </>
+      )}
+      {textOnlyDays > 0 && (
+        <p className="trend-note">另有 {textOnlyDays} 天的症狀是用文字記錄，沒有列入統計</p>
+      )}
+    </figure>
+  )
+}
+
 export function TrendCharts({ entries, today }: Props) {
   const trends = buildTrends(entries, today, DAYS)
+  const symptoms = buildSymptomTrend(entries, today, DAYS)
 
   return (
     <Section title={`最近 ${DAYS} 天趨勢`}>
@@ -176,6 +230,7 @@ export function TrendCharts({ entries, today }: Props) {
         points={trends.sleepHours}
         startDate={trends.startDate}
       />
+      <SymptomChart trend={symptoms} />
     </Section>
   )
 }

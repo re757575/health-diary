@@ -33,14 +33,18 @@ import {
   type FormValues,
 } from '@/domain/form'
 import { RatingPicker } from './RatingPicker'
+import { SymptomPicker } from './SymptomPicker'
 import { Status } from './Status'
 import { TimeField } from './TimeField'
+import { PRESET_SYMPTOMS } from '@/domain/symptom'
 import { useStatus } from './useStatus'
 
 interface Props {
   initial: FormValues
   /** 使用者改選日期時通知上層載入該日的紀錄 */
   onDateChange: (date: string) => void
+  /** 症狀選擇器的候選清單（預設症狀加上過去用過的）；沒給就只有預設症狀 */
+  knownSymptoms?: readonly string[]
 }
 
 const MEAL_PLACEHOLDERS: Record<MealType, string> = {
@@ -54,7 +58,7 @@ const emptyMeals = emptyForm('').meals
 
 const EMPTY_BOWEL: BowelFormValues = { time: '', bristol: '', note: '' }
 
-export function EntryForm({ initial, onDateChange }: Props) {
+export function EntryForm({ initial, onDateChange, knownSymptoms = PRESET_SYMPTOMS }: Props) {
   const [form, setForm] = useState(initial)
   const [status, setStatus] = useStatus()
   // 使用者已經看過「睡太久」警告並按了確認的那組入睡／起床時間；時間一改就不算數
@@ -316,9 +320,14 @@ export function EntryForm({ initial, onDateChange }: Props) {
           lowLabel="低落"
           highLabel="良好"
         />
+        <SymptomPicker
+          known={knownSymptoms}
+          items={form.symptomItems}
+          onChange={(items) => set('symptomItems', items)}
+        />
         <Textarea
-          label="症狀"
-          placeholder="例如：頭痛、胃脹"
+          label="症狀補充"
+          placeholder="例如：下午開車時腰椎酸痛"
           rows={2}
           value={form.symptoms}
           onChange={(e) => set('symptoms', e.target.value)}

@@ -1,4 +1,4 @@
-import { MEAL_TYPES, type Entry, type MealType } from './entry'
+import { MEAL_TYPES, type Entry, type MealType, type SymptomItem } from './entry'
 
 export interface BowelFormValues {
   time: string
@@ -17,6 +17,7 @@ export interface FormValues {
   bowel: BowelFormValues[]
   waterMl: string
   mood: string
+  symptomItems: SymptomItem[]
   symptoms: string
   notes: string
 }
@@ -71,6 +72,7 @@ export function emptyForm(date: string): FormValues {
     bowel: [],
     waterMl: '',
     mood: '',
+    symptomItems: [],
     symptoms: '',
     notes: '',
   }
@@ -104,6 +106,7 @@ export function formToEntry(form: FormValues): Entry {
       .filter((b) => b.time !== undefined || b.bristol !== undefined || b.note !== undefined),
     waterMl: toNumber(form.waterMl),
     mood: toNumber(form.mood),
+    symptomItems: form.symptomItems.length > 0 ? form.symptomItems : undefined,
     symptoms: toText(form.symptoms),
     notes: toText(form.notes),
   }
@@ -127,6 +130,7 @@ export function entryToForm(entry: Entry): FormValues {
     })),
     waterMl: str(entry.waterMl),
     mood: str(entry.mood),
+    symptomItems: entry.symptomItems ?? [],
     symptoms: entry.symptoms ?? '',
     notes: entry.notes ?? '',
   }

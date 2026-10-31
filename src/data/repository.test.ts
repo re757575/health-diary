@@ -1,3 +1,4 @@
+import Dexie from 'dexie'
 import { beforeEach, describe, expect, it } from 'vitest'
 import type { Condition } from '@/domain/condition'
 import type { Entry } from '@/domain/entry'
@@ -116,5 +117,47 @@ describe('importBackup', () => {
 
     await importBackup({ entries: [], conditions: [], profile: { heightCm: 175, sex: 'female' } })
     expect(await getProfile()).toEqual({ heightCm: 175, sex: 'female' })
+  })
+})
+
+describe('症狀項目與資料庫升版', () => {
+  it('症狀項目存進去、讀出來內容不變', async () => {
+    const symptomItems = [
+      { name: '頭痛', severity: 2 as const },
+      { name: '耳鳴', severity: 1 as const },
+    ]
+    await saveEntry(entry('2026-10-28', { symptomItems }))
+    expect((await getEntry('2026-10-28'))?.symptomItems).toEqual(symptomItems)
+  })
+
+  it('資料庫版本是 3', () => {
+    // Dexie 內部版本是宣告的 10 倍；verno 回傳宣告的版本
+    expect(db.verno).toBe(3)
+  })
+
+  it('v2 時代存的舊資料升版後仍在，沒有症狀項目', async () => {
+    db.close()
+    await Dexie.delete('health-diary')
+    const old = new Dexie('health-diary')
+    old.version(1).stores({ entries: 'date' })
+    old.version(2).stores({ entries: 'date', conditions: 'id', profile: 'id' })
+    await old.table('entries').put({
+      date: '2026-10-28',
+      meals: [],
+      bowel: [],
+      symptoms: '頭有點痛',
+    })
+    await old.table('conditions').put({ id: 'c1', name: '過敏性鼻炎', status: 'managed' })
+    old.close()
+
+    await db.open()
+
+    expect(await getEntry('2026-10-28')).toEqual({
+      date: '2026-10-28',
+      meals: [],
+      bowel: [],
+      symptoms: '頭有點痛',
+    })
+    expect(await listConditions()).toHaveLength(1)
   })
 })

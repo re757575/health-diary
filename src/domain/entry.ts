@@ -61,6 +61,24 @@ const sleepSchema = z.object({
   quality: z.number().int().min(1).max(5).optional(),
 })
 
+/** 症狀嚴重程度：1 輕、2 中、3 重 */
+export const SYMPTOM_SEVERITIES = [1, 2, 3] as const
+export type SymptomSeverity = (typeof SYMPTOM_SEVERITIES)[number]
+
+export const SEVERITY_LABELS: Record<SymptomSeverity, string> = { 1: '輕', 2: '中', 3: '重' }
+
+/** 輕／中／重各是什麼程度，顯示在症狀選擇器下方 */
+export const SEVERITY_DESCRIPTIONS = [
+  '輕：不太影響生活',
+  '中：有影響但還能忍受',
+  '重：嚴重影響，需要處理',
+] as const
+
+const symptomItemSchema = z.object({
+  name: z.string().trim().min(1),
+  severity: z.union([z.literal(1), z.literal(2), z.literal(3)]),
+})
+
 /** 每日一筆，以日期（YYYY-MM-DD）為主鍵 */
 export const entrySchema = z.object({
   date: z.string().regex(DATE),
@@ -71,6 +89,9 @@ export const entrySchema = z.object({
   waterMl: z.number().int().nonnegative().optional(),
   /** 自評心情／精神 1（很差）～ 5（很好） */
   mood: z.number().int().min(1).max(5).optional(),
+  /** 選取的症狀與嚴重程度（v3 新增，舊紀錄沒有） */
+  symptomItems: z.array(symptomItemSchema).optional(),
+  /** 症狀的文字補充；v3 之前所有症狀都寫在這裡 */
   symptoms: z.string().optional(),
   notes: z.string().optional(),
 })
@@ -78,6 +99,7 @@ export const entrySchema = z.object({
 export type Entry = z.infer<typeof entrySchema>
 export type Meal = z.infer<typeof mealSchema>
 export type Bowel = z.infer<typeof bowelSchema>
+export type SymptomItem = z.infer<typeof symptomItemSchema>
 
 /** 睡眠時數（小時）。跨午夜時自動加一天；缺少任一時間回傳 undefined */
 export function sleepHours(sleep: Entry['sleep']): number | undefined {

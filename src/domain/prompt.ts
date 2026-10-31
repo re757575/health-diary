@@ -1,11 +1,11 @@
 import { CONDITION_STATUS_LABELS, type Condition } from './condition'
-import { MEAL_LABELS, sleepHours, type Entry } from './entry'
+import { MEAL_LABELS, SEVERITY_LABELS, sleepHours, type Entry } from './entry'
 import { SEX_LABELS, ageOn, type Profile } from './profile'
 import { toDateString } from './form'
 
 const INSTRUCTIONS = `你是一位細心的健康數據分析助理。以下是我的每日飲食與健康紀錄，請協助分析：
 
-1. 找出飲食、睡眠、排便、體重、心情／症狀之間可能的關聯與規律（例如某些食物後隔天的排便或症狀變化）。若有提供「基本資料」與「已知疾病」，請納入考量。
+1. 找出飲食、睡眠、排便、體重、心情／症狀之間可能的關聯與規律（例如某些食物後隔天的排便或症狀變化）。症狀後括號內的輕／中／重是我自評的嚴重程度。若有提供「基本資料」與「已知疾病」，請納入考量。
 2. 指出值得留意的異常或趨勢，並說明你判斷的依據（引用日期與數值）。
 3. 資料不足以下結論的地方請明說，不要臆測。
 4. 提出可以進一步追蹤或調整的具體建議，以及需要補充記錄的項目。
@@ -49,7 +49,11 @@ function formatEntry(entry: Entry): string {
   }
 
   if (entry.mood !== undefined) lines.push(`- 心情／精神：${entry.mood}/5`)
-  if (entry.symptoms?.trim()) lines.push(`- 症狀：${entry.symptoms.trim()}`)
+  const symptoms = [
+    entry.symptomItems?.map((i) => `${i.name}（${SEVERITY_LABELS[i.severity]}）`).join('、'),
+    entry.symptoms?.trim(),
+  ].filter(Boolean)
+  if (symptoms.length > 0) lines.push(`- 症狀：${symptoms.join('；')}`)
   if (entry.notes?.trim()) lines.push(`- 備註：${entry.notes.trim()}`)
 
   return lines.join('\n')

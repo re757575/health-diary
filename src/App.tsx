@@ -1,9 +1,10 @@
 import { Badge, Button, Container, Divider, Group, Stack, Tabs, Text, Title } from '@mantine/core'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { Fragment, useState } from 'react'
+import { Fragment, useMemo, useState } from 'react'
 import { getEntry, getProfile, listEntries } from '@/data/repository'
 import { emptyForm, entryToForm, toDateString } from '@/domain/form'
 import { sleepHours } from '@/domain/entry'
+import { collectSymptomNames } from '@/domain/symptom'
 import { AboutSection } from './AboutSection'
 import { Conditions } from './Conditions'
 import { DataTools } from './DataTools'
@@ -22,6 +23,7 @@ export default function App() {
   // 對不上目前的 date 就當作還在載入；否則表單會用上一天的資料初始化，之後也不會更新
   const loaded = useLiveQuery(async () => ({ date, entry: await getEntry(date) }), [date])
   const history = useLiveQuery(listEntries, [])
+  const symptomNames = useMemo(() => collectSymptomNames(history ?? []), [history])
   // 同樣包一層物件區分「載入中」與「尚未填寫」
   const profile = useLiveQuery(async () => ({ value: await getProfile() }), [])
 
@@ -57,6 +59,7 @@ export default function App() {
                 key={date}
                 initial={loaded.entry ? entryToForm(loaded.entry) : emptyForm(date)}
                 onDateChange={setDate}
+                knownSymptoms={symptomNames}
               />
             )}
           </Section>

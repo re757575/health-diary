@@ -106,6 +106,16 @@ describe('formToEntry', () => {
   })
 })
 
+describe('症狀項目', () => {
+  it('沒有選任何症狀時，Entry 不帶 symptomItems', () => {
+    expect(formToEntry(emptyForm('2026-10-28')).symptomItems).toBeUndefined()
+  })
+
+  it('舊紀錄沒有 symptomItems，載入表單時是空陣列', () => {
+    expect(entryToForm({ date: '2026-10-28', meals: [], bowel: [] }).symptomItems).toEqual([])
+  })
+})
+
 describe('entryToForm', () => {
   it('編輯既有紀錄：Entry → 表單 → Entry 內容不變', () => {
     const entry = entrySchema.parse({
@@ -116,7 +126,11 @@ describe('entryToForm', () => {
       bowel: [{ time: '08:10', bristol: 4, note: '順暢' }],
       waterMl: 1800,
       mood: 4,
-      symptoms: '無',
+      symptomItems: [
+        { name: '頭痛', severity: 2 },
+        { name: '耳鳴', severity: 1 },
+      ],
+      symptoms: '下午開車時腰椎酸痛',
       notes: '早起運動',
     })
     expect(formToEntry(entryToForm(entry))).toEqual(entry)

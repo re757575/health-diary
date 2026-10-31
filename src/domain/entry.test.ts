@@ -37,6 +37,12 @@ describe('評分說明', () => {
 describe('entrySchema', () => {
   const base = { date: '2026-10-28', meals: [], bowel: [] }
 
+  it('症狀項目選填：舊紀錄沒有也合法，有的話名稱會去掉頭尾空白', () => {
+    expect(entrySchema.safeParse(base).success).toBe(true)
+    const parsed = entrySchema.parse({ ...base, symptomItems: [{ name: ' 頭痛 ', severity: 2 }] })
+    expect(parsed.symptomItems).toEqual([{ name: '頭痛', severity: 2 }])
+  })
+
   it('只有日期、空餐點與空排便也合法', () => {
     expect(entrySchema.safeParse(base).success).toBe(true)
   })
@@ -46,6 +52,8 @@ describe('entrySchema', () => {
     ['體重為負數', { ...base, weightKg: -1 }],
     ['布里斯托分類超出 1–7', { ...base, bowel: [{ bristol: 8 }] }],
     ['時間格式錯誤', { ...base, sleep: { bedtime: '25:00' } }],
+    ['症狀嚴重程度超出 1–3', { ...base, symptomItems: [{ name: '頭痛', severity: 4 }] }],
+    ['症狀名稱是空白', { ...base, symptomItems: [{ name: '  ', severity: 1 }] }],
     ['未知的餐別', { ...base, meals: [{ type: 'brunch', description: '' }] }],
   ])('拒絕：%s', (_name, input) => {
     expect(entrySchema.safeParse(input).success).toBe(false)

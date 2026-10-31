@@ -258,3 +258,64 @@ test('快速輸入：飲水 +250、時間「現在」按鈕、複製前一天的
   await expect(page.getByLabel('早餐')).toHaveValue('豆漿 蛋餅')
   await expect(page.getByLabel('午餐')).toHaveValue('自己打的午餐')
 })
+
+test('症狀：點選＋輕中重 → 自訂症狀 → 趨勢頁出現天數 → 隔天清單有自訂症狀 → 進 AI 提示詞', async ({
+  page,
+}) => {
+  await page.goto('./')
+
+  const symptoms = page.getByRole('group', { name: '症狀', exact: true })
+  await symptoms.getByRole('button', { name: '頭痛' }).click()
+  await page
+    .getByRole('group', { name: '頭痛的嚴重程度' })
+    .getByRole('button', { name: '重' })
+    .click()
+  await symptoms.getByRole('button', { name: '鼻塞' }).click()
+  // 自訂症狀：Enter 是新增，不會送出表單
+  await page.getByLabel('新增其他症狀').fill('耳鳴')
+  await page.getByLabel('新增其他症狀').press('Enter')
+  await expect(symptoms.getByRole('button', { name: '耳鳴' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  )
+  await expect(page.getByText(/已儲存/)).toHaveCount(0)
+  await page.getByLabel('症狀補充').fill('下午開車時腰椎酸痛')
+  await page.getByRole('button', { name: '儲存', exact: true }).click()
+  await expect(page.getByText(/已儲存 \d{4}-\d{2}-\d{2} 的紀錄/)).toBeVisible()
+
+  // 重新整理後仍是選取狀態，嚴重程度也在
+  await page.reload()
+  await expect(
+    page.getByRole('group', { name: '症狀', exact: true }).getByRole('button', { name: '頭痛' }),
+  ).toHaveAttribute('aria-pressed', 'true')
+  await expect(
+    page.getByRole('group', { name: '頭痛的嚴重程度' }).getByRole('button', { name: '重' }),
+  ).toHaveAttribute('aria-pressed', 'true')
+
+  // 趨勢頁：各症狀出現天數
+  await openTab(page, '趨勢')
+  const chart = page.getByRole('figure', { name: '症狀出現天數' })
+  await expect(chart.getByRole('listitem').filter({ hasText: '頭痛' })).toContainText(
+    '1 天（重 1）',
+  )
+  await expect(chart.getByRole('listitem').filter({ hasText: '鼻塞' })).toContainText(
+    '1 天（輕 1）',
+  )
+  await expect(chart.getByRole('listitem').filter({ hasText: '耳鳴' })).toContainText(
+    '1 天（輕 1）',
+  )
+
+  // 隔天的清單裡有自訂的「耳鳴」，但沒選
+  await openTab(page, '今天')
+  await page.getByRole('button', { name: '後一天', exact: true }).click()
+  await expect(
+    page.getByRole('group', { name: '症狀', exact: true }).getByRole('button', { name: '耳鳴' }),
+  ).toHaveAttribute('aria-pressed', 'false')
+
+  // AI 提示詞：症狀附上程度
+  await openTab(page, '設定')
+  await page.getByRole('button', { name: '產生 AI 提示詞' }).click()
+  await expect(page.getByLabel('提示詞')).toContainText(
+    '症狀：頭痛（重）、鼻塞（輕）、耳鳴（輕）；下午開車時腰椎酸痛',
+  )
+})

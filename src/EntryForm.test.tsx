@@ -361,3 +361,119 @@ describe('EntryForm：快速輸入', () => {
     })
   })
 })
+
+describe('EntryForm：症狀', () => {
+  const symptomButton = (name: string) => screen.getByRole('button', { name, pressed: undefined })
+  const severity = (symptom: string, label: string) =>
+    within(screen.getByRole('group', { name: `${symptom}的嚴重程度` })).getByRole('button', {
+      name: label,
+    })
+
+  it('列出預設的常用症狀，一開始都沒選，也沒有嚴重程度的選項', () => {
+    renderForm()
+
+    const group = within(screen.getByRole('group', { name: '症狀' }))
+    expect(group.getAllByRole('button').map((b) => b.textContent)).toContain('頭痛')
+    for (const button of group.getAllByRole('button')) {
+      expect(button).toHaveAttribute('aria-pressed', 'false')
+    }
+    expect(screen.queryByRole('group', { name: /的嚴重程度/ })).not.toBeInTheDocument()
+  })
+
+  it('點選症狀後預設輕，可改成中或重，再點一次症狀就取消', async () => {
+    const user = userEvent.setup()
+    renderForm()
+
+    await user.click(symptomButton('頭痛'))
+    expect(symptomButton('頭痛')).toHaveAttribute('aria-pressed', 'true')
+    expect(severity('頭痛', '輕')).toHaveAttribute('aria-pressed', 'true')
+
+    await user.click(severity('頭痛', '重'))
+    expect(severity('頭痛', '重')).toHaveAttribute('aria-pressed', 'true')
+    expect(severity('頭痛', '輕')).toHaveAttribute('aria-pressed', 'false')
+
+    await user.click(symptomButton('頭痛'))
+    expect(screen.queryByRole('group', { name: '頭痛的嚴重程度' })).not.toBeInTheDocument()
+  })
+
+  it('每個症狀的嚴重程度各自獨立，儲存後連同文字補充一起存起來', async () => {
+    const user = userEvent.setup()
+    renderForm()
+
+    await user.click(symptomButton('頭痛'))
+    await user.click(symptomButton('鼻塞'))
+    await user.click(severity('鼻塞', '中'))
+    await user.type(screen.getByLabelText('症狀補充'), '下午開車時腰椎酸痛')
+    await user.click(screen.getByRole('button', { name: '儲存' }))
+
+    await screen.findByText(`已儲存 ${DATE} 的紀錄`)
+    const entry = await getEntry(DATE)
+    expect(entry?.symptomItems).toEqual([
+      { name: '頭痛', severity: 1 },
+      { name: '鼻塞', severity: 2 },
+    ])
+    expect(entry?.symptoms).toBe('下午開車時腰椎酸痛')
+  })
+
+  it('輸入清單裡沒有的症狀：按新增或 Enter 都會加入；Enter 不會送出整張表單', async () => {
+    const user = userEvent.setup()
+    renderForm()
+    const input = screen.getByLabelText('新增其他症狀')
+
+    await user.type(input, '耳鳴{Enter}')
+    expect(screen.getByRole('button', { name: '耳鳴' })).toHaveAttribute('aria-pressed', 'true')
+    expect(input).toHaveValue('')
+    expect(screen.getByRole('status')).toHaveTextContent('')
+    expect(await getEntry(DATE)).toBeUndefined()
+
+    await user.type(input, '手麻')
+    await user.click(screen.getByRole('button', { name: '新增' }))
+    expect(screen.getByRole('button', { name: '手麻' })).toHaveAttribute('aria-pressed', 'true')
+
+    // 重複輸入已選的症狀不會多一筆；空白不會新增
+    await user.type(input, '耳鳴{Enter}')
+    await user.type(input, '   {Enter}')
+    expect(screen.getAllByRole('button', { name: '耳鳴' })).toHaveLength(1)
+    expect(screen.getAllByRole('group', { name: /的嚴重程度/ })).toHaveLength(2)
+  })
+
+  it('自己輸入的症狀可以取消選取', async () => {
+    const user = userEvent.setup()
+    renderForm()
+
+    await user.type(screen.getByLabelText('新增其他症狀'), '耳鳴{Enter}')
+    await user.click(screen.getByRole('button', { name: '耳鳴' }))
+
+    expect(screen.queryByRole('group', { name: '耳鳴的嚴重程度' })).not.toBeInTheDocument()
+  })
+
+  it('候選清單用傳進來的 knownSymptoms（過去用過的症狀）', () => {
+    render(
+      <EntryForm
+        initial={emptyForm(DATE)}
+        onDateChange={() => {}}
+        knownSymptoms={['頭痛', '耳鳴']}
+      />,
+    )
+
+    const group = within(screen.getByRole('group', { name: '症狀' }))
+    expect(group.getAllByRole('button').map((b) => b.textContent)).toEqual(['頭痛', '耳鳴'])
+  })
+
+  it('載入已存的紀錄時，症狀與嚴重程度是選取狀態；舊紀錄的文字症狀留在補充欄', () => {
+    render(
+      <EntryForm
+        initial={{
+          ...emptyForm(DATE),
+          symptomItems: [{ name: '頭痛', severity: 3 }],
+          symptoms: '喉嚨有點痛',
+        }}
+        onDateChange={() => {}}
+      />,
+    )
+
+    expect(symptomButton('頭痛')).toHaveAttribute('aria-pressed', 'true')
+    expect(severity('頭痛', '重')).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByLabelText('症狀補充')).toHaveValue('喉嚨有點痛')
+  })
+})

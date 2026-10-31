@@ -64,12 +64,14 @@ textarea.mantine-Textarea-input {
 :root {
   --series-weight: #2a78d6;
   --series-sleep: #eb6834;
+  --series-symptom: #7a5ccf;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
     --series-weight: #3987e5;
     --series-sleep: #d95926;
+    --series-symptom: #9b7be0;
   }
 }
 
@@ -119,6 +121,10 @@ textarea.mantine-Textarea-input {
   --series: var(--series-sleep);
 }
 
+.series-symptom {
+  --series: var(--series-symptom);
+}
+
 .trend-line {
   fill: none;
   stroke: var(--series);
@@ -159,4 +165,59 @@ textarea.mantine-Textarea-input {
 
 .trend-segment {
   white-space: nowrap;
+}
+
+/* 症狀出現天數：名稱、長條、說明三欄；說明在第二列對齊長條 */
+.symptom-bars {
+  display: grid;
+  gap: 0.625rem;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.symptom-bars li {
+  display: grid;
+  grid-template-columns: 4.5rem 1fr;
+  align-items: center;
+  column-gap: 0.5rem;
+  row-gap: 0.125rem;
+}
+
+.symptom-name {
+  font-size: 0.875rem;
+}
+
+.symptom-track {
+  display: flex;
+  height: 0.75rem;
+  overflow: hidden;
+  border-radius: 0.25rem;
+  background: color-mix(in srgb, currentColor 10%, transparent);
+}
+
+.symptom-seg {
+  background: var(--series);
+}
+
+/* 同一個顏色用不透明度分輕、中、重，深色代表比較嚴重 */
+.symptom-seg-1 {
+  opacity: 0.4;
+}
+
+.symptom-seg-2 {
+  opacity: 0.7;
+}
+
+.symptom-count {
+  grid-column: 2;
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--mantine-color-dimmed);
+}
+
+.trend .trend-note {
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--mantine-color-dimmed);
 }

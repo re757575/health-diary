@@ -4,12 +4,15 @@ import { entrySchema, type Entry } from './entry'
 import { profileSchema, type Profile } from './profile'
 
 export const BACKUP_APP = 'health-diary'
-/** v1 只有 entries；v2 新增 conditions 與 profile。匯入時兩個版本都接受 */
-export const BACKUP_VERSION = 2
+/**
+ * v1 只有 entries；v2 新增 conditions 與 profile；v3 的紀錄多了 symptomItems（症狀與嚴重程度）。
+ * 匯入時三個版本都接受：舊備份沒有的欄位都是選填
+ */
+export const BACKUP_VERSION = 3
 
 const backupSchema = z.object({
   app: z.literal(BACKUP_APP),
-  version: z.union([z.literal(1), z.literal(2)]),
+  version: z.union([z.literal(1), z.literal(2), z.literal(3)]),
   exportedAt: z.string(),
   entries: z.array(entrySchema),
   // 以下欄位 v1 備份沒有

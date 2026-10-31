@@ -65,6 +65,22 @@ describe('buildAnalysisPrompt', () => {
     expect(prompt).toContain('- 症狀：輕微腹脹')
   })
 
+  it('症狀：點選的項目附上輕／中／重，文字補充接在後面', () => {
+    const prompt = buildAnalysisPrompt([
+      entry('2026-10-28', {
+        symptomItems: [
+          { name: '頭痛', severity: 2 },
+          { name: '鼻塞', severity: 1 },
+        ],
+        symptoms: '下午開車時腰椎酸痛',
+      }),
+      entry('2026-10-29', { symptomItems: [{ name: '腹脹', severity: 3 }] }),
+    ])
+    expect(prompt).toContain('- 症狀：頭痛（中）、鼻塞（輕）；下午開車時腰椎酸痛')
+    expect(prompt).toContain('- 症狀：腹脹（重）')
+    expect(prompt).toContain('輕／中／重是我自評的嚴重程度')
+  })
+
   it('有填基本資料與已知疾病時，加上對應段落並算出年齡', () => {
     const prompt = buildAnalysisPrompt([entry('2026-10-28')], {
       profile: { birthday: '1990-05-20', heightCm: 175, sex: 'male' },

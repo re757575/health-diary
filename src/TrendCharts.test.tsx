@@ -93,3 +93,54 @@ describe('TrendCharts：沒有資料', () => {
     expect(screen.getByText('最近 30 天還沒有體重紀錄')).toBeInTheDocument()
   })
 })
+
+describe('TrendCharts：症狀出現天數', () => {
+  const withSymptoms = (date: string, ...items: [string, 1 | 2 | 3][]) =>
+    entry(date, { symptomItems: items.map(([name, severity]) => ({ name, severity })) })
+
+  it('列出各症狀的天數與輕／中／重分布，天數多的在前', () => {
+    render(
+      <TrendCharts
+        entries={[
+          withSymptoms('2026-10-26', ['頭痛', 1], ['鼻塞', 2]),
+          withSymptoms('2026-10-27', ['頭痛', 2]),
+          withSymptoms('2026-10-28', ['頭痛', 3]),
+          entry('2026-10-25', { weightKg: 70 }),
+        ]}
+        today={today}
+      />,
+    )
+
+    const figure = screen.getByRole('figure', { name: '症狀出現天數' })
+    expect(figure).toHaveTextContent('最近 30 天有 4 天有紀錄')
+    const rows = within(figure).getAllByRole('listitem')
+    expect(rows.map((row) => row.textContent)).toEqual([
+      '頭痛3 天（輕 1 · 中 1 · 重 1）',
+      '鼻塞1 天（中 1）',
+    ])
+  })
+
+  it('還沒有點選的症狀時顯示說明', () => {
+    render(<TrendCharts entries={[entry('2026-10-28', { weightKg: 70 })]} today={today} />)
+
+    expect(screen.getByRole('figure', { name: '症狀出現天數' })).toHaveTextContent(
+      '最近 30 天還沒有點選記錄的症狀',
+    )
+  })
+
+  it('有些天只用文字寫症狀時，說明那幾天沒有列入統計', () => {
+    render(
+      <TrendCharts
+        entries={[
+          entry('2026-10-27', { symptoms: '頭有點痛' }),
+          withSymptoms('2026-10-28', ['頭痛', 1]),
+        ]}
+        today={today}
+      />,
+    )
+
+    expect(screen.getByRole('figure', { name: '症狀出現天數' })).toHaveTextContent(
+      '另有 1 天的症狀是用文字記錄，沒有列入統計',
+    )
+  })
+})

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Entry } from './entry'
-import { buildTrends, summarizeSeries } from './trend'
+import { buildSymptomTrend, buildTrends, summarizeSeries } from './trend'
 
 const entry = (date: string, extra: Partial<Entry> = {}): Entry => ({
   date,
@@ -106,5 +106,66 @@ describe('buildTrends：區間與體重', () => {
       today,
     )
     expect(trends.weight.map((p) => p.date)).toEqual(['2026-10-01'])
+  })
+})
+
+describe('buildSymptomTrend', () => {
+  const withSymptoms = (date: string, ...items: [string, 1 | 2 | 3][]) =>
+    entry(date, { symptomItems: items.map(([name, severity]) => ({ name, severity })) })
+
+  it('沒有紀錄時是空的', () => {
+    expect(buildSymptomTrend([], today)).toEqual({ recordedDays: 0, textOnlyDays: 0, items: [] })
+  })
+
+  it('每個症狀算出現的天數與輕／中／重各幾天，依天數由多到少', () => {
+    const trend = buildSymptomTrend(
+      [
+        withSymptoms('2026-10-26', ['頭痛', 1], ['鼻塞', 2]),
+        withSymptoms('2026-10-27', ['頭痛', 2]),
+        withSymptoms('2026-10-28', ['頭痛', 3]),
+        entry('2026-10-25', { weightKg: 70 }),
+      ],
+      today,
+    )
+    expect(trend.recordedDays).toBe(4)
+    expect(trend.items).toEqual([
+      { name: '頭痛', days: 3, bySeverity: { 1: 1, 2: 1, 3: 1 } },
+      { name: '鼻塞', days: 1, bySeverity: { 1: 0, 2: 1, 3: 0 } },
+    ])
+  })
+
+  it('天數相同時依名稱排序', () => {
+    const names = buildSymptomTrend(
+      [withSymptoms('2026-10-28', ['鼻塞', 1], ['頭痛', 1], ['腰痠', 1])],
+      today,
+    ).items.map((i) => i.name)
+    expect(names).toEqual([...names].sort((a, b) => a.localeCompare(b, 'zh-Hant')))
+  })
+
+  it('只統計區間內（含今天）的紀錄', () => {
+    const trend = buildSymptomTrend(
+      [withSymptoms('2026-09-28', ['頭痛', 1]), withSymptoms('2026-09-29', ['頭痛', 1])],
+      today,
+    )
+    // 區間 30 天：2026-09-29 ～ 2026-10-28
+    expect(trend.recordedDays).toBe(1)
+    expect(trend.items).toEqual([{ name: '頭痛', days: 1, bySeverity: { 1: 1, 2: 0, 3: 0 } }])
+  })
+
+  it('同一天重複的症狀只算一天', () => {
+    const trend = buildSymptomTrend([withSymptoms('2026-10-28', ['頭痛', 1], ['頭痛', 3])], today)
+    expect(trend.items[0]).toMatchObject({ name: '頭痛', days: 1 })
+  })
+
+  it('只用文字寫症狀的天數另外計，不列入各症狀統計', () => {
+    const trend = buildSymptomTrend(
+      [
+        entry('2026-10-27', { symptoms: '頭痛' }),
+        entry('2026-10-28', { symptoms: '頭痛', symptomItems: [{ name: '頭痛', severity: 1 }] }),
+      ],
+      today,
+    )
+    expect(trend.textOnlyDays).toBe(1)
+    expect(trend.items).toHaveLength(1)
   })
 })
