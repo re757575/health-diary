@@ -45,10 +45,10 @@ export function buildLineChart({
   const innerHeight = box.height - top - bottom
   const xOf = (dayIndex: number) => round1(left + (dayIndex / (days - 1)) * innerWidth)
 
-  // 每 7 天一個刻度，從最後一天往回數，讓最右邊永遠是「今天」
-  const xTicks = Array.from({ length: Math.floor((days - 1) / 7) + 1 }, (_, i) => days - 1 - i * 7)
-    .reverse()
-    .map((dayIndex) => ({ x: xOf(dayIndex), label: labelOf(startDate, dayIndex) }))
+  const xTicks = tickDayIndexes(days).map((dayIndex) => ({
+    x: xOf(dayIndex),
+    label: labelOf(startDate, dayIndex),
+  }))
 
   const carriedIn = carry?.carriedIn
   if (points.length === 0 && carriedIn === undefined) {
@@ -98,6 +98,18 @@ export function buildLineChart({
     carried.push(segment([xOf(Math.max(previous.dayIndex, 0)), y], [xOf(days - 1), y]))
   }
   return { path: solid.join(' '), carriedPath: carried.join(' '), dots, yTicks, xTicks }
+}
+
+/**
+ * 日期軸刻度落在第幾天：從最後一天往回數，讓最右邊永遠是「今天」。
+ * 間距隨區間變長：30 天每 7 天、90 天每 15 天、1 年約每兩個月，刻度都維持 5～7 個
+ */
+export function tickDayIndexes(days: number): number[] {
+  const step = days <= 31 ? 7 : days <= 92 ? 15 : 61
+  return Array.from(
+    { length: Math.floor((days - 1) / step) + 1 },
+    (_, i) => days - 1 - i * step,
+  ).reverse()
 }
 
 /** 起點日期加上 `dayIndex` 天，格式 MM/DD（用 UTC 計算，避開夏令時間） */

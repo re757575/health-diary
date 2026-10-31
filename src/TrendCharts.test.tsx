@@ -1,4 +1,5 @@
 import { screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { render } from '@/test/render'
 import { describe, expect, it } from 'vitest'
 import type { Entry } from '@/domain/entry'
@@ -316,5 +317,34 @@ describe('TrendCharts：體重沿用', () => {
     const figure = screen.getByRole('figure', { name: '體重趨勢' })
     expect(figure).toHaveTextContent('虛線：沒量的日子，維持上一次量的數值')
     expect(figure.querySelector('.trend-line-carried')).not.toBeNull()
+  })
+})
+
+describe('TrendCharts：切換區間', () => {
+  it('預設 30 天；切到 1 年會納入更早的紀錄，標題與說明跟著改', async () => {
+    const user = userEvent.setup()
+    render(
+      <TrendCharts
+        entries={[entry('2026-05-01', { weightKg: 75 }), entry('2026-10-28', { weightKg: 70 })]}
+        today={today}
+      />,
+    )
+    const ranges = screen.getByRole('group', { name: '趨勢區間' })
+    expect(within(ranges).getByRole('button', { name: '30 天' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+    expect(screen.getByRole('img', { name: /^體重趨勢折線圖，共 1 筆紀錄/ })).toBeInTheDocument()
+
+    await user.click(within(ranges).getByRole('button', { name: '1 年' }))
+
+    expect(screen.getByRole('region', { name: '最近 1 年趨勢' })).toBeInTheDocument()
+    expect(within(ranges).getByRole('button', { name: '1 年' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+    expect(screen.getByRole('img', { name: /^體重趨勢折線圖，共 2 筆紀錄/ })).toBeInTheDocument()
+    expect(screen.getByRole('figure', { name: '體重趨勢' })).toHaveTextContent('區間變化 −5 kg')
+    expect(screen.getByText('最近 1 年還沒有睡眠紀錄（需要填入睡與起床時間）')).toBeInTheDocument()
   })
 })

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildLineChart, niceTicks, type ChartBox } from './chart-scale'
+import { buildLineChart, niceTicks, tickDayIndexes, type ChartBox } from './chart-scale'
 
 // 內部繪圖區 300 × 130，左上角在 (30, 10)
 const box: ChartBox = {
@@ -151,5 +151,13 @@ describe('buildLineChart：沿用模式（體重沒量時維持上一次）', ()
     expect(chart.dots).toEqual([])
     expect(chart.path).toBe('')
     expect(chart.carriedPath).toBe(`M${xOf(0)} 75 L${xOf(29)} 75`)
+  })
+})
+
+describe('tickDayIndexes', () => {
+  it('最右邊永遠是最後一天，間距隨區間變長，刻度維持 5～7 個', () => {
+    expect(tickDayIndexes(30)).toEqual([1, 8, 15, 22, 29])
+    expect(tickDayIndexes(90)).toEqual([14, 29, 44, 59, 74, 89])
+    expect(tickDayIndexes(365)).toEqual([59, 120, 181, 242, 303, 364])
   })
 })

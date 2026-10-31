@@ -1,5 +1,6 @@
-import { Fragment, useId } from 'react'
-import { buildLineChart, labelOf, type ChartBox } from '@/domain/chart-scale'
+import { Button, Group } from '@mantine/core'
+import { Fragment, useId, useState } from 'react'
+import { buildLineChart, labelOf, tickDayIndexes, type ChartBox } from '@/domain/chart-scale'
 import {
   MIN_COMPARE_DAYS,
   SHORT_SLEEP_HOURS,
@@ -29,7 +30,18 @@ interface Props {
   today: Date
 }
 
-const DAYS = 30
+/** 可以切換的區間；label 也用在標題與說明（「最近 30 天…」） */
+const RANGES = [
+  { days: 30, label: '30 天' },
+  { days: 90, label: '90 天' },
+  { days: 365, label: '1 年' },
+] as const
+
+/** 目前顯示的區間 */
+interface Range {
+  days: number
+  label: string
+}
 
 const BOX: ChartBox = {
   width: 340,
@@ -67,6 +79,8 @@ interface ChartProps {
   seriesClass: string
   points: TrendPoint[]
   startDate: string
+  /** 區間天數（日期軸的長度） */
+  days: number
   /** 圖下方的補充說明，例如有資料因疑似填錯而沒列入 */
   note?: string
   /**
@@ -85,6 +99,7 @@ function TrendChart({
   seriesClass,
   points,
   startDate,
+  days,
   note,
   carry,
 }: ChartProps) {
@@ -104,7 +119,7 @@ function TrendChart({
   const chart = buildLineChart({
     points,
     startDate,
-    days: DAYS,
+    days,
     box: BOX,
     carry: carry && { carriedIn: carry.carriedIn?.kg },
   })
@@ -171,7 +186,10 @@ function TrendChart({
         )}
         {chart.dots.map((dot) => (
           <g key={dot.date}>
-            <circle className="trend-dot" cx={dot.x} cy={dot.y} r={4} />
+            {/* 點很密時縮小；1 年時每天的點會疊成一串，只留線（感應圈仍在，點得到數值） */}
+            {days <= 92 && (
+              <circle className="trend-dot" cx={dot.x} cy={dot.y} r={days > 31 ? 2.5 : 4} />
+            )}
             <circle className="trend-hit" cx={dot.x} cy={dot.y} r={HIT_RADIUS}>
               <title>{`${dot.date} · ${dot.value} ${unit}`}</title>
             </circle>
@@ -216,7 +234,8 @@ const STRIP = {
   width: 340,
   rowHeight: 16,
   rowGap: 6,
-  margin: { top: 4, right: 8, bottom: 20, left: 40 },
+  // 右邊留白要夠放下最後一個日期刻度（置中於最右邊那格）的半個字寬，和折線圖一樣
+  margin: { top: 4, right: 20, bottom: 20, left: 40 },
 }
 const STRIP_ROWS = [
   { key: 'sleep', label: '睡眠', className: 'series-sleep' },
@@ -240,7 +259,7 @@ function groupRow(label: string, group: SleepGroup) {
   )
 }
 
-function DailyChart({ daily }: { daily: Daily }) {
+function DailyChart({ daily, period }: { daily: Daily; period: string }) {
   const headingId = useId()
   const { cells, startDate, days } = daily
   const hasData = cells.some(
@@ -251,7 +270,7 @@ function DailyChart({ daily }: { daily: Daily }) {
     return (
       <figure className="trend" aria-labelledby={headingId}>
         <h3 id={headingId}>睡眠、心情與症狀對照</h3>
-        <p>最近 {DAYS} 天還沒有睡眠、心情或症狀的紀錄</p>
+        <p>最近 {period}還沒有睡眠、心情或症狀的紀錄</p>
       </figure>
     )
   }
@@ -263,10 +282,11 @@ function DailyChart({ daily }: { daily: Daily }) {
   const height = top + rowsHeight + bottom
   const xOf = (dayIndex: number) => left + dayIndex * cellWidth
   const rowY = (row: number) => top + row * (STRIP.rowHeight + STRIP.rowGap)
-  // 與折線圖一樣每 7 天一個刻度，最右邊是今天
-  const xTicks = Array.from({ length: Math.floor((days - 1) / 7) + 1 }, (_, i) => days - 1 - i * 7)
-    .reverse()
-    .map((dayIndex) => ({ x: xOf(dayIndex) + cellWidth / 2, label: labelOf(startDate, dayIndex) }))
+  // 刻度與折線圖相同，最右邊是今天
+  const xTicks = tickDayIndexes(days).map((dayIndex) => ({
+    x: xOf(dayIndex) + cellWidth / 2,
+    label: labelOf(startDate, dayIndex),
+  }))
 
   const comparison = compareBySleep(cells)
   const comparable =
@@ -281,7 +301,7 @@ function DailyChart({ daily }: { daily: Daily }) {
 
       <svg
         role="img"
-        aria-label={`最近 ${DAYS} 天睡眠、心情與症狀一覽，共 ${cells.length} 天有紀錄`}
+        aria-label={`最近 ${period}睡眠、心情與症狀一覽，共 ${cells.length} 天有紀錄`}
         viewBox={`0 0 ${STRIP.width} ${height}`}
       >
         {STRIP_ROWS.map((row, r) => (
@@ -308,8 +328,10 @@ function DailyChart({ daily }: { daily: Daily }) {
           </text>
         ))}
         {cells.map((cell) => {
-          const x = xOf(cell.dayIndex) + 0.5
-          const width = cellWidth - 1
+          // 每格太窄（1 年時不到 1 像素）就不留間隔，連成一條色帶
+          const gap = cellWidth > 3 ? 1 : 0
+          const x = xOf(cell.dayIndex) + gap / 2
+          const width = cellWidth - gap
           const rect = (
             row: number,
             className: string,
@@ -407,7 +429,7 @@ function DailyChart({ daily }: { daily: Daily }) {
   )
 }
 
-function SymptomChart({ trend }: { trend: SymptomTrend }) {
+function SymptomChart({ trend, period }: { trend: SymptomTrend; period: string }) {
   const headingId = useId()
   const { recordedDays, textOnlyDays, items } = trend
 
@@ -415,10 +437,10 @@ function SymptomChart({ trend }: { trend: SymptomTrend }) {
     <figure className="trend series-symptom" aria-labelledby={headingId}>
       <h3 id={headingId}>症狀出現天數</h3>
       <p>
-        最近 {DAYS} 天有 {recordedDays} 天有紀錄
+        最近 {period}有 {recordedDays} 天有紀錄
       </p>
       {items.length === 0 ? (
-        <p>最近 {DAYS} 天還沒有點選記錄的症狀</p>
+        <p>最近 {period}還沒有點選記錄的症狀</p>
       ) : (
         <>
           <ul className="symptom-bars">
@@ -454,21 +476,39 @@ function SymptomChart({ trend }: { trend: SymptomTrend }) {
 }
 
 export function TrendCharts({ entries, today }: Props) {
-  const trends = buildTrends(entries, today, DAYS)
-  const symptoms = buildSymptomTrend(entries, today, DAYS)
-  const daily = buildDaily(entries, today, DAYS)
+  const [range, setRange] = useState<Range>(RANGES[0])
+  const { days, label: period } = range
+  const trends = buildTrends(entries, today, days)
+  const symptoms = buildSymptomTrend(entries, today, days)
+  const daily = buildDaily(entries, today, days)
 
   return (
-    <Section title={`最近 ${DAYS} 天趨勢`}>
+    <Section title={`最近 ${period}趨勢`}>
+      {/* 體重這類變化要看幾個月才看得出走向，可以拉長區間 */}
+      <Group role="group" aria-label="趨勢區間" gap="xs" mb="md" grow>
+        {RANGES.map((r) => (
+          <Button
+            key={r.days}
+            type="button"
+            size="compact-md"
+            variant={r.days === days ? 'filled' : 'default'}
+            aria-pressed={r.days === days}
+            onClick={() => setRange(r)}
+          >
+            {r.label}
+          </Button>
+        ))}
+      </Group>
       <TrendChart
         title="體重趨勢"
         subject="體重"
         valueHeader="體重"
         unit="kg"
-        emptyText={`最近 ${DAYS} 天還沒有體重紀錄`}
+        emptyText={`最近 ${period}還沒有體重紀錄`}
         seriesClass="series-weight"
         points={trends.weight}
         startDate={trends.startDate}
+        days={days}
         carry={{ carriedIn: trends.weightCarriedIn }}
       />
       <TrendChart
@@ -476,14 +516,15 @@ export function TrendCharts({ entries, today }: Props) {
         subject="睡眠時數"
         valueHeader="睡眠時數"
         unit="小時"
-        emptyText={`最近 ${DAYS} 天還沒有睡眠紀錄（需要填入睡與起床時間）`}
+        emptyText={`最近 ${period}還沒有睡眠紀錄（需要填入睡與起床時間）`}
         seriesClass="series-sleep"
         points={trends.sleepHours}
         startDate={trends.startDate}
+        days={days}
         note={suspectSleepNote(trends.suspectSleepDates)}
       />
-      <DailyChart daily={daily} />
-      <SymptomChart trend={symptoms} />
+      <DailyChart daily={daily} period={period} />
+      <SymptomChart trend={symptoms} period={period} />
     </Section>
   )
 }
