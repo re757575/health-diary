@@ -67,6 +67,34 @@ export function parseBackup(text: string): ParseBackupResult {
   return { ok: true, entries, conditions, profile }
 }
 
+export interface ImportPreview {
+  /** 這台裝置上還沒有的日期 */
+  added: string[]
+  /** 這台裝置上已有、但內容和備份不同的日期；匯入後會被備份的內容取代 */
+  replaced: string[]
+}
+
+/** 序列化成可比較的字串：物件的鍵排序過，同樣內容不會因為欄位順序不同而被當成不一樣 */
+const canonical = (value: unknown): string =>
+  JSON.stringify(value, (_key, v: unknown) =>
+    v && typeof v === 'object' && !Array.isArray(v)
+      ? Object.fromEntries(Object.entries(v).sort(([a], [b]) => a.localeCompare(b)))
+      : v,
+  )
+
+/** 匯入前比對備份與現有紀錄，日期由舊到新。內容完全相同的日子不列入，匯入也不會有變化 */
+export function previewImport(incoming: Entry[], existing: Entry[]): ImportPreview {
+  const current = new Map(existing.map((e) => [e.date, canonical(e)]))
+  const added: string[] = []
+  const replaced: string[] = []
+  for (const entry of [...incoming].sort((a, b) => a.date.localeCompare(b.date))) {
+    const stored = current.get(entry.date)
+    if (stored === undefined) added.push(entry.date)
+    else if (stored !== canonical(entry)) replaced.push(entry.date)
+  }
+  return { added, replaced }
+}
+
 /** 距離上次備份（沒備份過就從第一筆紀錄算起）幾天以上就提醒備份 */
 export const BACKUP_REMINDER_DAYS = 7
 

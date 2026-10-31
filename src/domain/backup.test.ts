@@ -4,6 +4,7 @@ import {
   backupStatus,
   describeLastBackup,
   parseBackup,
+  previewImport,
   serializeBackup,
 } from './backup'
 import type { Condition } from './condition'
@@ -162,5 +163,29 @@ describe('備份提醒', () => {
     expect(describeLastBackup(undefined, now)).toBe('還沒有備份過')
     expect(describeLastBackup(new Date(2026, 9, 31, 8).toISOString(), now)).toBe('上次備份：今天')
     expect(describeLastBackup(daysAgo(11), now)).toBe('上次備份：2026-10-20（11 天前）')
+  })
+})
+
+describe('previewImport', () => {
+  it('分出新增的日期與內容不同、會被覆蓋的日期，內容相同的不列入', () => {
+    const existing = [entry('2026-10-01', { weightKg: 70 }), entry('2026-10-02', { weightKg: 71 })]
+    const incoming = [
+      entry('2026-10-03'),
+      entry('2026-10-02', { weightKg: 69 }),
+      entry('2026-10-01', { weightKg: 70 }),
+    ]
+    expect(previewImport(incoming, existing)).toEqual({
+      added: ['2026-10-03'],
+      replaced: ['2026-10-02'],
+    })
+  })
+
+  it('匯出後原封不動匯入，沒有任何會被覆蓋的日子', () => {
+    const existing = [
+      entry('2026-10-01', { weightKg: 70, sleep: { bedtime: '23:00', wakeTime: '07:00' } }),
+    ]
+    const parsed = parseBackup(serializeBackup({ entries: existing, conditions: [] }))
+    if (!parsed.ok) throw new Error(parsed.error)
+    expect(previewImport(parsed.entries, existing)).toEqual({ added: [], replaced: [] })
   })
 })

@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { db } from '@/data/db'
 import { getProfile } from '@/data/repository'
 import { serializeBackup } from '@/domain/backup'
+import type { Entry } from '@/domain/entry'
 import { shiftDate, toDateString } from '@/domain/form'
 import App from './App'
 
@@ -61,6 +62,64 @@ describe('App', () => {
     await openTab(user, '趨勢')
     expect(await screen.findByText('2026-01-02')).toBeInTheDocument()
     expect(screen.getByText('65 kg')).toBeInTheDocument()
+  })
+
+  describe('匯入會覆蓋內容不同的紀錄時', () => {
+    const importFile = async (user: UserEvent, entries: Entry[]) => {
+      const backup = serializeBackup({ entries, conditions: [] })
+      await openTab(user, '設定')
+      await user.upload(
+        await screen.findByLabelText('匯入備份'),
+        new File([backup], 'backup.json', { type: 'application/json' }),
+      )
+    }
+    const day = (date: string, weightKg: number): Entry => ({
+      date,
+      weightKg,
+      meals: [],
+      bowel: [],
+    })
+
+    it('先列出會被覆蓋的日期請使用者確認；取消就完全不匯入', async () => {
+      const user = userEvent.setup()
+      const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
+      await db.entries.put(day('2026-01-02', 70))
+      render(<App />)
+
+      await importFile(user, [day('2026-01-02', 65), day('2026-01-03', 66)])
+
+      expect(await screen.findByText('已取消匯入，資料沒有變動')).toBeInTheDocument()
+      expect(confirm).toHaveBeenCalledWith(expect.stringContaining('有 1 天（2026-01-02）'))
+      expect((await db.entries.get('2026-01-02'))?.weightKg).toBe(70)
+      expect(await db.entries.get('2026-01-03')).toBeUndefined()
+      confirm.mockRestore()
+    })
+
+    it('確認後才以備份內容覆蓋', async () => {
+      const user = userEvent.setup()
+      const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true)
+      await db.entries.put(day('2026-01-02', 70))
+      render(<App />)
+
+      await importFile(user, [day('2026-01-02', 65)])
+
+      expect(await screen.findByText('已匯入 1 筆紀錄')).toBeInTheDocument()
+      expect((await db.entries.get('2026-01-02'))?.weightKg).toBe(65)
+      confirm.mockRestore()
+    })
+
+    it('只新增或內容相同時不用確認', async () => {
+      const user = userEvent.setup()
+      const confirm = vi.spyOn(window, 'confirm')
+      await db.entries.put(day('2026-01-02', 70))
+      render(<App />)
+
+      await importFile(user, [day('2026-01-02', 70), day('2026-01-03', 66)])
+
+      expect(await screen.findByText('已匯入 2 筆紀錄')).toBeInTheDocument()
+      expect(confirm).not.toHaveBeenCalled()
+      confirm.mockRestore()
+    })
   })
 
   it('匯入格式錯誤的檔案會顯示錯誤，不改動資料', async () => {

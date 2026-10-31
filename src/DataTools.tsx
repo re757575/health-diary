@@ -8,7 +8,7 @@ import {
   listConditions,
   listEntries,
 } from '@/data/repository'
-import { describeLastBackup, parseBackup } from '@/domain/backup'
+import { describeLastBackup, parseBackup, previewImport } from '@/domain/backup'
 import { buildAnalysisPrompt, recentEntries } from '@/domain/prompt'
 import { exportBackup } from './exportBackup'
 import { Section } from './Section'
@@ -21,6 +21,10 @@ const RANGES = [
   { label: '最近 30 天', days: 30 },
   { label: '全部', days: Infinity },
 ]
+
+/** 列出日期；太多時只列前幾個 */
+const formatDates = (dates: string[], max = 3) =>
+  dates.length > max ? `${dates.slice(0, max).join('、')} 等` : dates.join('、')
 
 export function DataTools() {
   const [days, setDays] = useState(7)
@@ -41,6 +45,18 @@ export function DataTools() {
     const result = parseBackup(await file.text())
     if (!result.ok) {
       setStatus(`匯入失敗：${result.error}`, true)
+      return
+    }
+    // 匯入會以備份為準覆蓋同一天的紀錄；用舊備份蓋掉較新的內容就救不回來，所以先確認
+    const { replaced } = previewImport(result.entries, await listEntries())
+    if (
+      replaced.length > 0 &&
+      !window.confirm(
+        `備份檔中有 ${replaced.length} 天（${formatDates(replaced)}）和這台裝置上的紀錄不同，` +
+          '匯入後會改成備份檔的內容，目前的內容將遺失。確定要匯入嗎？',
+      )
+    ) {
+      setStatus('已取消匯入，資料沒有變動')
       return
     }
     await importBackup(result)
