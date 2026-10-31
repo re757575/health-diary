@@ -2,6 +2,14 @@
 
 本檔案由 [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) 依照 [Conventional Commits](https://www.conventionalcommits.org/) 規範的 commit 訊息自動產生，請勿手動編輯內容，執行 `npm run release` 即可更新。
 
+## [0.1.10](https://github.com/re757575/health-diary/compare/v0.1.9...v0.1.10) (2026-10-31)
+
+### Features
+
+* **backup:** 手機上匯出備份改用系統分享選單 ([8600cb4](https://github.com/re757575/health-diary/commit/8600cb41ded8b6f53eda8400964f532fc0a23566))
+* **entry:** 體重和上次差太多時，儲存前先確認是否打錯 ([9c2539c](https://github.com/re757575/health-diary/commit/9c2539c3885e6dbafdb066ede7e5e9d156f91ca9))
+* **pwa:** 回到 App 時檢查新版，沒有未儲存的修改就在背景自動更新 ([fcb5e28](https://github.com/re757575/health-diary/commit/fcb5e2881a65504cd6dd73081870ecb59974863c))
+* **trend:** 趨勢頁可切換 30 天、90 天與 1 年 ([d96925e](https://github.com/re757575/health-diary/commit/d96925eae98db00bb8427bcc4c09142e5071da6a))
 ## [0.1.9](https://github.com/re757575/health-diary/compare/v0.1.8...v0.1.9) (2026-10-31)
 
 ### Features
