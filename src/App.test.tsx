@@ -387,6 +387,94 @@ describe('切換日期', () => {
   })
 })
 
+describe('刪除紀錄', () => {
+  const today = toDateString(new Date())
+
+  it('刪除後從歷史紀錄消失，按「復原」內容完整回來', async () => {
+    const user = userEvent.setup()
+    const entry = {
+      date: '2026-01-02',
+      weightKg: 65,
+      meals: [{ type: 'lunch' as const, description: '便當' }],
+      bowel: [],
+    }
+    await db.entries.put(entry)
+    render(<App />)
+
+    await openTab(user, '趨勢')
+    await user.click(await screen.findByRole('button', { name: '刪除 2026-01-02' }))
+
+    expect(await screen.findByText('已刪除 2026-01-02 的紀錄')).toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByText('65 kg')).not.toBeInTheDocument())
+    expect(await db.entries.get('2026-01-02')).toBeUndefined()
+
+    await user.click(screen.getByRole('button', { name: '復原' }))
+    expect(await screen.findByText('已復原 2026-01-02 的紀錄')).toBeInTheDocument()
+    expect(await db.entries.get('2026-01-02')).toEqual(entry)
+    expect(screen.queryByRole('button', { name: '復原' })).not.toBeInTheDocument()
+  })
+
+  it('刪除正在編輯的那天：表單跟著清空，復原後又載入，都不算未儲存的修改', async () => {
+    const user = userEvent.setup()
+    const confirm = vi.spyOn(window, 'confirm')
+    await db.entries.put({ date: today, weightKg: 70, meals: [], bowel: [] })
+    render(<App />)
+    expect(await screen.findByLabelText('體重（kg）')).toHaveValue(70)
+
+    await openTab(user, '趨勢')
+    await user.click(await screen.findByRole('button', { name: `刪除 ${today}` }))
+    await openTab(user, '今天')
+    await waitFor(() => expect(screen.getByLabelText('體重（kg）')).toHaveValue(null))
+
+    await openTab(user, '趨勢')
+    await user.click(screen.getByRole('button', { name: '復原' }))
+    await openTab(user, '今天')
+    await waitFor(() => expect(screen.getByLabelText('體重（kg）')).toHaveValue(70))
+
+    await user.click(screen.getByRole('button', { name: '前一天' }))
+    expect(confirm).not.toHaveBeenCalled()
+    confirm.mockRestore()
+  })
+
+  it('表單有未儲存的修改時，刪除那天不會洗掉正在輸入的內容', async () => {
+    const user = userEvent.setup()
+    await db.entries.put({ date: today, weightKg: 70, meals: [], bowel: [] })
+    render(<App />)
+    await user.type(await screen.findByLabelText('早餐'), '燕麥奶')
+
+    await openTab(user, '趨勢')
+    await user.click(await screen.findByRole('button', { name: `刪除 ${today}` }))
+    await screen.findByText(`已刪除 ${today} 的紀錄`)
+    await openTab(user, '今天')
+
+    expect(screen.getByLabelText('早餐')).toHaveValue('燕麥奶')
+    expect(screen.getByLabelText('體重（kg）')).toHaveValue(70)
+  })
+})
+
+describe('表單與資料同步', () => {
+  it('匯入的備份包含正在顯示的那天、表單沒有修改時，表單換成匯入的內容', async () => {
+    const user = userEvent.setup()
+    const today = toDateString(new Date())
+    render(<App />)
+    await screen.findByLabelText('體重（kg）')
+
+    const backup = serializeBackup({
+      entries: [{ date: today, weightKg: 64, meals: [], bowel: [] }],
+      conditions: [],
+    })
+    await openTab(user, '設定')
+    await user.upload(
+      await screen.findByLabelText('匯入備份'),
+      new File([backup], 'backup.json', { type: 'application/json' }),
+    )
+    await screen.findByText('已匯入 1 筆紀錄')
+    await openTab(user, '今天')
+
+    await waitFor(() => expect(screen.getByLabelText('體重（kg）')).toHaveValue(64))
+  })
+})
+
 describe('趨勢圖', () => {
   it('還沒有紀錄時顯示空狀態，儲存體重與睡眠後圖立刻出現', async () => {
     const user = userEvent.setup()

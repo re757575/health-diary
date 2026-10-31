@@ -1,10 +1,9 @@
-import { Badge, Button, Container, Divider, Group, Stack, Tabs, Text, Title } from '@mantine/core'
+import { Container, Stack, Tabs, Title } from '@mantine/core'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { Fragment, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { getEntry, getLastBackupAt, getProfile, listEntries } from '@/data/repository'
 import { backupStatus } from '@/domain/backup'
 import { emptyForm, entryToForm, toDateString } from '@/domain/form'
-import { sleepHours } from '@/domain/entry'
 import { collectSymptomNames } from '@/domain/symptom'
 import { collectTagNames } from '@/domain/tag'
 import { AboutSection } from './AboutSection'
@@ -13,6 +12,7 @@ import { Conditions } from './Conditions'
 import { DataTools } from './DataTools'
 import { findIncompleteDays } from '@/domain/quality'
 import { EntryForm } from './EntryForm'
+import { HistoryList } from './HistoryList'
 import { MissingNotice } from './MissingNotice'
 import { ProfileForm } from './ProfileForm'
 import { Section } from './Section'
@@ -131,47 +131,7 @@ export default function App() {
           <Stack gap="md">
             {history && <TrendCharts entries={history} today={new Date()} />}
 
-            <Section title="歷史紀錄">
-              {history?.length === 0 && <Text>還沒有紀錄。</Text>}
-              <Stack component="ul" gap={0} p={0} m={0} style={{ listStyle: 'none' }}>
-                {history?.map((entry, i) => {
-                  const hours = sleepHours(entry.sleep)
-                  return (
-                    <Fragment key={entry.date}>
-                      {i > 0 && <Divider component="li" />}
-                      <Group component="li" justify="space-between" wrap="nowrap" py="xs">
-                        <div>
-                          <Group gap="xs">
-                            <Text fw={600}>{entry.date}</Text>
-                            {entry.date === date && (
-                              <Badge variant="light" size="sm">
-                                編輯中
-                              </Badge>
-                            )}
-                          </Group>
-                          <Text size="sm" c="dimmed">
-                            {[
-                              entry.weightKg !== undefined && `${entry.weightKg} kg`,
-                              hours !== undefined && `睡 ${hours} 小時`,
-                            ]
-                              .filter(Boolean)
-                              .join(' · ') || '只有文字紀錄'}
-                          </Text>
-                        </div>
-                        <Button
-                          variant="light"
-                          size="compact-md"
-                          aria-label={`編輯 ${entry.date}`}
-                          onClick={() => editDate(entry.date)}
-                        >
-                          編輯
-                        </Button>
-                      </Group>
-                    </Fragment>
-                  )
-                })}
-              </Stack>
-            </Section>
+            {history && <HistoryList entries={history} editingDate={date} onEdit={editDate} />}
           </Stack>
         </Tabs.Panel>
 

@@ -73,6 +73,13 @@ export function EntryForm({
   knownTags = PRESET_TAGS,
 }: Props) {
   const [form, setForm] = useState(initial)
+  // 這天的紀錄在別處被改掉（刪除、復原、匯入備份）時，上層會傳來新的 initial：
+  // 沒有未儲存的修改就換成新的內容；有修改則保留使用者的輸入（此時會算成有未儲存的修改）
+  const [shownInitial, setShownInitial] = useState(initial)
+  if (!isSameEntry(initial, shownInitial)) {
+    setShownInitial(initial)
+    if (isSameEntry(form, shownInitial)) setForm(initial)
+  }
   const [status, setStatus] = useStatus()
   // 使用者已經看過「睡太久」警告並按了確認的那組入睡／起床時間；時間一改就不算數
   const [confirmedSleep, setConfirmedSleep] = useState<string | null>(null)
