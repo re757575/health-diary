@@ -44,6 +44,22 @@ export default function App() {
     return () => window.removeEventListener('beforeunload', warn)
   }, [dirty])
 
+  // App 開著的那天。安裝成 App 後常整晚留在背景，隔天回到前景時要換成新的今天，
+  // 否則會把紀錄寫進前一天
+  const [today, setToday] = useState(() => toDateString(new Date()))
+  useEffect(() => {
+    function checkNewDay() {
+      if (document.visibilityState !== 'visible') return
+      const now = toDateString(new Date())
+      if (now === today) return
+      setToday(now)
+      // 原本停在今天、也沒有未儲存的修改才跟著換；正在看別天或改到一半就不動
+      if (date === today && !dirty) setDate(now)
+    }
+    document.addEventListener('visibilitychange', checkNewDay)
+    return () => document.removeEventListener('visibilitychange', checkNewDay)
+  }, [today, date, dirty])
+
   /** 換一天編輯；表單是每天重新載入的，有未儲存的修改要先確認，回傳是否真的換了 */
   function changeDate(next: string): boolean {
     if (next === date) return true

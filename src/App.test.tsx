@@ -1,7 +1,7 @@
-import { screen, waitFor, within } from '@testing-library/react'
+import { act, screen, waitFor, within } from '@testing-library/react'
 import { render } from '@/test/render'
 import userEvent, { type UserEvent } from '@testing-library/user-event'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { db } from '@/data/db'
 import { getProfile } from '@/data/repository'
 import { serializeBackup } from '@/domain/backup'
@@ -232,6 +232,56 @@ describe('備份提醒', () => {
     render(<App />)
     await screen.findByRole('region', { name: '未填完的紀錄' })
     expect(screen.queryByRole('region', { name: '備份提醒' })).not.toBeInTheDocument()
+  })
+})
+
+describe('過了午夜回到 App', () => {
+  // 只假造 Date，不動計時器（Dexie 與 RTL 都靠真的計時器）
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date(2026, 9, 30, 23, 50))
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  const comeBackNextMorning = () => {
+    vi.setSystemTime(new Date(2026, 9, 31, 8, 0))
+    act(() => {
+      document.dispatchEvent(new Event('visibilitychange'))
+    })
+  }
+
+  it('原本停在今天、沒有未儲存的修改，就換成新的今天', async () => {
+    render(<App />)
+    expect(await screen.findByLabelText('日期')).toHaveValue('2026-10-30')
+
+    comeBackNextMorning()
+
+    await waitFor(() => expect(screen.getByLabelText('日期')).toHaveValue('2026-10-31'))
+  })
+
+  it('有未儲存的修改時留在原本那天，輸入還在', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await user.type(await screen.findByLabelText('體重（kg）'), '70')
+
+    comeBackNextMorning()
+
+    expect(screen.getByLabelText('日期')).toHaveValue('2026-10-30')
+    expect(screen.getByLabelText('體重（kg）')).toHaveValue(70)
+  })
+
+  it('正在看別天時不跳走', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await screen.findByLabelText('日期')
+    await user.click(screen.getByRole('button', { name: '前一天' }))
+    await waitFor(() => expect(screen.getByLabelText('日期')).toHaveValue('2026-10-29'))
+
+    comeBackNextMorning()
+
+    expect(screen.getByLabelText('日期')).toHaveValue('2026-10-29')
   })
 })
 
