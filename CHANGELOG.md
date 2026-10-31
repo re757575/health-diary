@@ -2,6 +2,22 @@
 
 本檔案由 [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) 依照 [Conventional Commits](https://www.conventionalcommits.org/) 規範的 commit 訊息自動產生，請勿手動編輯內容，執行 `npm run release` 即可更新。
 
+## [0.1.5](https://github.com/re757575/health-diary/compare/v0.1.4...v0.1.5) (2026-10-31)
+
+### Features
+
+* **entry:** 在今天分頁提示最近沒填完的紀錄 ([40b922d](https://github.com/re757575/health-diary/commit/40b922dfe4deba02f3d98a2bdb10f01cbfe03e36))
+* **entry:** 即時顯示睡眠時數，超過 12 小時要先確認 ([3eaa7d2](https://github.com/re757575/health-diary/commit/3eaa7d2ecee12a5c3ede7f38a1cdfc2a561a876f))
+* **entry:** 新增飲水 +250、時間「現在」與複製前一天餐點 ([ed76e9c](https://github.com/re757575/health-diary/commit/ed76e9c3c151d4327032de4efca402e8bbd71bcc))
+* **entry:** 新增運動分鐘數與當日狀況標籤 ([9e0ae57](https://github.com/re757575/health-diary/commit/9e0ae572329f2f3ed3c737c7cac4ca4f5b29b1f8))
+* **prompt:** 在 AI 提示詞加上資料品質備註 ([e2dc945](https://github.com/re757575/health-diary/commit/e2dc9458338d49f01fa5898536589278ae7901cb))
+* **symptom:** 症狀改為點選常用症狀並分輕中重，趨勢頁顯示出現天數 ([d2b3353](https://github.com/re757575/health-diary/commit/d2b3353936be7e57556086ca73e55b80c113bcae))
+* **trend:** 趨勢頁新增睡眠、心情與症狀對照 ([1b289e5](https://github.com/re757575/health-diary/commit/1b289e5283a740105acdd9092b7f397e4d068bf3))
+
+### Bug Fixes
+
+* **entry:** 漏填提示預設只列最近 3 天 ([d69d276](https://github.com/re757575/health-diary/commit/d69d276d3bc444e1b01af82862fbb406cc3b0ea4))
+* **trend:** 睡眠時數折線圖排除超過 12 小時的疑似填錯日子 ([830bc04](https://github.com/re757575/health-diary/commit/830bc04801e8c9c662fcdad45b1e556fe1453273))
 ## [0.1.4](https://github.com/re757575/health-diary/compare/v0.1.3...v0.1.4) (2026-10-29)
 
 ### Features
