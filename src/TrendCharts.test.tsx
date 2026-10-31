@@ -222,3 +222,57 @@ describe('TrendCharts：睡眠、心情與症狀對照', () => {
     ).toEqual(['2026-10-278 小時4/5最重中', '2026-10-28—3/5沒有症狀'])
   })
 })
+
+describe('TrendCharts：睡眠超過 12 小時', () => {
+  const suspect = (date: string) => entry(date, { sleep: { bedtime: '11:50', wakeTime: '07:40' } })
+  const normal = (date: string) => entry(date, { sleep: { bedtime: '23:00', wakeTime: '07:00' } })
+
+  it('疑似填錯的日子不畫進折線圖，也不影響最新值與平均，並說明沒列入的日期', () => {
+    render(
+      <TrendCharts
+        entries={[normal('2026-10-26'), suspect('2026-10-27'), normal('2026-10-28')]}
+        today={today}
+      />,
+    )
+
+    const figure = screen.getByRole('figure', { name: '睡眠時數趨勢' })
+    expect(
+      within(figure).getByRole('img', { name: '睡眠時數趨勢折線圖，共 2 筆紀錄' }),
+    ).toBeInTheDocument()
+    expect(figure).toHaveTextContent('最新 8 小時（10/28） · 區間變化 ±0 小時 · 平均 8 小時')
+    expect(figure).toHaveTextContent(
+      '1 天的睡眠時數超過 12 小時，可能是入睡或起床時間填錯，未列入圖表（10/27）',
+    )
+    expect(within(figure).queryByText(/19\.8/)).not.toBeInTheDocument()
+  })
+
+  it('全部都是疑似填錯時，顯示沒有睡眠紀錄，仍說明沒列入的原因', () => {
+    render(<TrendCharts entries={[suspect('2026-10-28')]} today={today} />)
+
+    const figure = screen.getByRole('figure', { name: '睡眠時數趨勢' })
+    expect(within(figure).queryByRole('img')).not.toBeInTheDocument()
+    expect(figure).toHaveTextContent('最近 30 天還沒有睡眠紀錄')
+    expect(figure).toHaveTextContent('1 天的睡眠時數超過 12 小時')
+  })
+
+  it('超過 3 天時只列最近 3 天，其餘用「等」帶過', () => {
+    render(
+      <TrendCharts
+        entries={['20', '21', '22', '23'].map((d) => suspect(`2026-10-${d}`))}
+        today={today}
+      />,
+    )
+
+    expect(screen.getByRole('figure', { name: '睡眠時數趨勢' })).toHaveTextContent(
+      '4 天的睡眠時數超過 12 小時，可能是入睡或起床時間填錯，未列入圖表（10/21、10/22、10/23 等）',
+    )
+  })
+
+  it('沒有疑似填錯的日子就不顯示說明', () => {
+    render(<TrendCharts entries={[normal('2026-10-28')]} today={today} />)
+
+    expect(screen.getByRole('figure', { name: '睡眠時數趨勢' })).not.toHaveTextContent(
+      '超過 12 小時',
+    )
+  })
+})

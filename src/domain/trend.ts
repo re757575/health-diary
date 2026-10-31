@@ -1,4 +1,4 @@
-import { sleepHours, type Entry, type SymptomSeverity } from './entry'
+import { LONG_SLEEP_HOURS, sleepHours, type Entry, type SymptomSeverity } from './entry'
 import { toDateString } from './form'
 
 export interface TrendPoint {
@@ -13,7 +13,10 @@ export interface Trends {
   endDate: string
   days: number
   weight: TrendPoint[]
+  /** 睡眠時數的點；超過 12 小時的多半是填錯，不收 */
   sleepHours: TrendPoint[]
+  /** 因睡眠時數超過 12 小時而沒有列入的日期，由舊到新 */
+  suspectSleepDates: string[]
 }
 
 export interface SeriesSummary {
@@ -85,7 +88,13 @@ export function buildTrends(entries: Entry[], today: Date, days = 30): Trends {
     endDate,
     days,
     weight: toPoints((e) => e.weightKg),
-    sleepHours: toPoints((e) => sleepHours(e.sleep)),
+    sleepHours: toPoints((e) => {
+      const hours = sleepHours(e.sleep)
+      return hours !== undefined && hours <= LONG_SLEEP_HOURS ? hours : undefined
+    }),
+    suspectSleepDates: inWindow
+      .filter((e) => (sleepHours(e.sleep) ?? 0) > LONG_SLEEP_HOURS)
+      .map((e) => e.date),
   }
 }
 

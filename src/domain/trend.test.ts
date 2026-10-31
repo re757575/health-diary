@@ -54,6 +54,34 @@ describe('buildTrends：睡眠時數', () => {
     expect(trends.sleepHours).toEqual([{ date: '2026-10-26', dayIndex: 27, value: 7.5 }])
   })
 
+  it('睡眠超過 12 小時多半是填錯，不畫進圖，日期另外列出；剛好 12 小時還是收', () => {
+    const trends = buildTrends(
+      [
+        entry('2026-10-25', { sleep: { bedtime: '22:00', wakeTime: '10:00' } }),
+        entry('2026-10-26', { sleep: { bedtime: '11:50', wakeTime: '07:40' } }),
+        entry('2026-10-27', { sleep: { bedtime: '23:50', wakeTime: '07:40' } }),
+        entry('2026-10-28', { sleep: { bedtime: '11:30', wakeTime: '07:10' } }),
+      ],
+      today,
+    )
+    expect(trends.sleepHours.map((p) => [p.date, p.value])).toEqual([
+      ['2026-10-25', 12],
+      ['2026-10-27', 7.8],
+    ])
+    expect(trends.suspectSleepDates).toEqual(['2026-10-26', '2026-10-28'])
+  })
+
+  it('區間外的疑似填錯不列入；沒有疑似填錯時是空陣列', () => {
+    const trends = buildTrends(
+      [
+        entry('2026-09-01', { sleep: { bedtime: '11:50', wakeTime: '07:40' } }),
+        entry('2026-10-28', { sleep: { bedtime: '23:00', wakeTime: '07:00' } }),
+      ],
+      today,
+    )
+    expect(trends.suspectSleepDates).toEqual([])
+  })
+
   it('體重與睡眠各自獨立：只填睡眠的日子不會出現在體重', () => {
     const trends = buildTrends(
       [entry('2026-10-28', { sleep: { bedtime: '00:00', wakeTime: '06:00' } })],

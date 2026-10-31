@@ -183,7 +183,9 @@ test('分頁：切換不丟輸入；歷史紀錄按編輯回到今天並載入�
   await expect(page.getByLabel('體重（kg）')).toHaveValue('69')
 })
 
-test('睡眠時數：即時顯示；超過 12 小時要確認，改正時間後可直接儲存', async ({ page }) => {
+test('睡眠時數：即時顯示；超過 12 小時要確認、不畫進趨勢圖，改正時間後可直接儲存', async ({
+  page,
+}) => {
   await page.goto('./')
 
   await page.getByLabel('入睡時間').fill('23:50')
@@ -209,11 +211,23 @@ test('睡眠時數：即時顯示；超過 12 小時要確認，改正時間後�
   await page.reload()
   await expect(page.getByLabel('入睡時間')).toHaveValue('11:50')
 
+  // 趨勢頁：疑似填錯的睡眠不畫進圖，並說明原因
+  await openTab(page, '趨勢')
+  const sleepChart = page.getByRole('figure', { name: '睡眠時數趨勢' })
+  await expect(sleepChart).toContainText('最近 30 天還沒有睡眠紀錄')
+  await expect(sleepChart).toContainText('1 天的睡眠時數超過 12 小時')
+  await openTab(page, '今天')
+
   // 改正後不再警告，一次儲存
   await page.getByLabel('入睡時間').fill('23:50')
   await expect(page.getByText(/是不是填錯了/)).toHaveCount(0)
   await page.getByRole('button', { name: '儲存', exact: true }).click()
   await expect(page.getByText(/已儲存 \d{4}-\d{2}-\d{2} 的紀錄/)).toBeVisible()
+
+  // 改正後睡眠回到趨勢圖，不再有說明
+  await openTab(page, '趨勢')
+  await expect(sleepChart).toContainText('最新 7.8 小時')
+  await expect(sleepChart).not.toContainText('超過 12 小時')
 })
 
 test('快速輸入：飲水 +250、時間「現在」按鈕、複製前一天的餐點', async ({ page }) => {

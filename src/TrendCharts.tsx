@@ -12,7 +12,7 @@ import {
   type SleepGroup,
 } from '@/domain/daily'
 import type { Entry } from '@/domain/entry'
-import { SEVERITY_LABELS, SYMPTOM_SEVERITIES } from '@/domain/entry'
+import { LONG_SLEEP_HOURS, SEVERITY_LABELS, SYMPTOM_SEVERITIES } from '@/domain/entry'
 import {
   buildSymptomTrend,
   buildTrends,
@@ -47,6 +47,13 @@ function formatChange(change: number, unit: string): string {
   return `${change > 0 ? '+' : '−'}${Math.abs(change)} ${unit}`
 }
 
+/** 睡眠超過 12 小時而沒畫進圖的日子；請使用者回去改入睡或起床時間 */
+function suspectSleepNote(dates: string[]): string | undefined {
+  if (dates.length === 0) return undefined
+  const shown = dates.slice(-3).map(shortDate).join('、')
+  return `${dates.length} 天的睡眠時數超過 ${LONG_SLEEP_HOURS} 小時，可能是入睡或起床時間填錯，未列入圖表（${shown}${dates.length > 3 ? ' 等' : ''}）。請到「歷史紀錄」編輯修正。`
+}
+
 interface ChartProps {
   title: string
   /** 資料表與圖的名稱，例如「體重」 */
@@ -59,6 +66,8 @@ interface ChartProps {
   seriesClass: string
   points: TrendPoint[]
   startDate: string
+  /** 圖下方的補充說明，例如有資料因疑似填錯而沒列入 */
+  note?: string
 }
 
 function TrendChart({
@@ -70,6 +79,7 @@ function TrendChart({
   seriesClass,
   points,
   startDate,
+  note,
 }: ChartProps) {
   const headingId = useId()
 
@@ -78,6 +88,7 @@ function TrendChart({
       <figure className="trend" aria-labelledby={headingId}>
         <h3 id={headingId}>{title}</h3>
         <p>{emptyText}</p>
+        {note && <p className="trend-note">{note}</p>}
       </figure>
     )
   }
@@ -165,6 +176,7 @@ function TrendChart({
           </tbody>
         </table>
       </details>
+      {note && <p className="trend-note">{note}</p>}
     </figure>
   )
 }
@@ -437,6 +449,7 @@ export function TrendCharts({ entries, today }: Props) {
         seriesClass="series-sleep"
         points={trends.sleepHours}
         startDate={trends.startDate}
+        note={suspectSleepNote(trends.suspectSleepDates)}
       />
       <DailyChart daily={daily} />
       <SymptomChart trend={symptoms} />
