@@ -135,6 +135,61 @@ describe('分頁', () => {
   })
 })
 
+describe('漏填提示', () => {
+  const today = toDateString(new Date())
+  const twoDaysAgo = shiftDate(today, -2)
+  const yesterday = shiftDate(today, -1)
+
+  it('最近有沒填完的日子時，在「今天」分頁列出，整天沒記錄的也算', async () => {
+    await db.entries.bulkPut([
+      { date: twoDaysAgo, meals: [], bowel: [], weightKg: 68 },
+      { date: today, meals: [], bowel: [] },
+    ])
+    render(<App />)
+
+    const notice = await screen.findByRole('region', { name: '未填完的紀錄' })
+    expect(notice).toHaveTextContent('最近有 2 天的紀錄沒填完')
+    expect(notice).toHaveTextContent('整天沒有紀錄')
+    expect(notice).toHaveTextContent('沒填：飲水、睡眠時間、心情')
+  })
+
+  it('按「補填」載入那一天的紀錄，補完存檔後該天就不再提示', async () => {
+    const user = userEvent.setup()
+    await db.entries.put({
+      date: yesterday,
+      meals: [],
+      bowel: [],
+      weightKg: 68,
+      waterMl: 2000,
+      sleep: { bedtime: '23:30', wakeTime: '07:00' },
+    })
+    render(<App />)
+
+    await user.click(await screen.findByRole('button', { name: `補填 ${yesterday}` }))
+    expect(await screen.findByLabelText('日期')).toHaveValue(yesterday)
+    expect(screen.getByLabelText('體重（kg）')).toHaveValue(68)
+
+    await user.click(
+      within(screen.getByRole('group', { name: '心情／精神（1–5）' })).getByRole('button', {
+        name: '3',
+      }),
+    )
+    await user.click(screen.getByRole('button', { name: '儲存' }))
+    await screen.findByText(`已儲存 ${yesterday} 的紀錄`)
+
+    await waitFor(() =>
+      expect(screen.queryByRole('region', { name: '未填完的紀錄' })).not.toBeInTheDocument(),
+    )
+  })
+
+  it('還沒有任何紀錄時不提示', async () => {
+    render(<App />)
+
+    await screen.findByLabelText('體重（kg）')
+    expect(screen.queryByRole('region', { name: '未填完的紀錄' })).not.toBeInTheDocument()
+  })
+})
+
 describe('切換日期', () => {
   it('用前一天、後一天切換日期時，載入的是那一天的紀錄，不是上一天的', async () => {
     const user = userEvent.setup()

@@ -9,7 +9,9 @@ import { collectTagNames } from '@/domain/tag'
 import { AboutSection } from './AboutSection'
 import { Conditions } from './Conditions'
 import { DataTools } from './DataTools'
+import { findIncompleteDays } from '@/domain/quality'
 import { EntryForm } from './EntryForm'
+import { MissingNotice } from './MissingNotice'
 import { ProfileForm } from './ProfileForm'
 import { Section } from './Section'
 import { TrendCharts } from './TrendCharts'
@@ -55,17 +57,26 @@ export default function App() {
         </Tabs.List>
 
         <Tabs.Panel value="today" pt="md">
-          <Section title="每日紀錄">
-            {loaded?.date === date && (
-              <EntryForm
-                key={date}
-                initial={loaded.entry ? entryToForm(loaded.entry) : emptyForm(date)}
-                onDateChange={setDate}
-                knownSymptoms={symptomNames}
-                knownTags={tagNames}
+          <Stack gap="md">
+            {history && (
+              <MissingNotice
+                days={findIncompleteDays(history, new Date())}
+                currentDate={date}
+                onFill={setDate}
               />
             )}
-          </Section>
+            <Section title="每日紀錄">
+              {loaded?.date === date && (
+                <EntryForm
+                  key={date}
+                  initial={loaded.entry ? entryToForm(loaded.entry) : emptyForm(date)}
+                  onDateChange={setDate}
+                  knownSymptoms={symptomNames}
+                  knownTags={tagNames}
+                />
+              )}
+            </Section>
+          </Stack>
         </Tabs.Panel>
 
         <Tabs.Panel value="trends" pt="md">

@@ -386,3 +386,39 @@ test('AI 提示詞的資料品質備註：標出疑似填錯的睡眠與漏填�
   await expect(prompt).toContainText(`- 沒填：心情 1 天（${yesterday}）`)
   await expect(prompt).not.toContainText('體重 1 天')
 })
+
+test('漏填提示：列出沒填完的日子，補填跳到那天，補完後消失', async ({ page }) => {
+  await page.goto('./')
+  const notice = page.getByRole('region', { name: '未填完的紀錄' })
+  await expect(notice).toHaveCount(0)
+
+  // 前一天只填體重並儲存
+  await page.getByRole('button', { name: '前一天', exact: true }).click()
+  await page.getByLabel('體重（kg）').fill('68')
+  await page.getByRole('button', { name: '儲存', exact: true }).click()
+  await expect(page.getByText(/已儲存 \d{4}-\d{2}-\d{2} 的紀錄/)).toBeVisible()
+  const yesterday = await page.getByLabel('日期').inputValue()
+
+  // 正在編輯那一天：列出缺漏，但不給補填
+  await expect(notice).toContainText('最近有 1 天的紀錄沒填完')
+  await expect(notice).toContainText('沒填：飲水、睡眠時間、心情')
+  await expect(notice.getByText('編輯中')).toBeVisible()
+
+  // 回到今天：可以按補填跳回前一天，體重還在
+  await page.getByRole('button', { name: '後一天', exact: true }).click()
+  await page.getByRole('button', { name: `補填 ${yesterday}` }).click()
+  await expect(page.getByLabel('日期')).toHaveValue(yesterday)
+  await expect(page.getByLabel('體重（kg）')).toHaveValue('68')
+
+  // 補完所有核心欄位後存檔，提示消失
+  await page.getByLabel('飲水（ml）').fill('2000')
+  await page.getByLabel('入睡時間').fill('23:30')
+  await page.getByLabel('起床時間').fill('07:00')
+  await page
+    .getByRole('group', { name: '心情／精神（1–5）' })
+    .getByRole('button', { name: '3' })
+    .click()
+  await page.getByRole('button', { name: '儲存', exact: true }).click()
+  await expect(page.getByText(/已儲存 \d{4}-\d{2}-\d{2} 的紀錄/)).toBeVisible()
+  await expect(notice).toHaveCount(0)
+})
