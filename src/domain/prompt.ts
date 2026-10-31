@@ -2,6 +2,7 @@ import { CONDITION_STATUS_LABELS, type Condition } from './condition'
 import { MEAL_LABELS, SEVERITY_LABELS, sleepHours, type Entry } from './entry'
 import { SEX_LABELS, ageOn, type Profile } from './profile'
 import { toDateString } from './form'
+import { findLongSleeps, missingFields } from './quality'
 
 const INSTRUCTIONS = `你是一位細心的健康數據分析助理。以下是我的每日飲食與健康紀錄，請協助分析：
 
@@ -68,6 +69,41 @@ export function recentEntries(entries: Entry[], days: number, today: Date): Entr
   return entries.filter((e) => e.date >= startDate)
 }
 
+/** 列出日期；太多時只列前幾個，其餘用「等」帶過 */
+function formatDates(dates: string[], max = 5): string {
+  return dates.length > max ? `${dates.slice(0, max).join('、')} 等` : dates.join('、')
+}
+
+/**
+ * 自動檢查出的資料問題：疑似填錯的睡眠時數，以及漏填的核心欄位。
+ * 今天的紀錄可能還在填，不算漏填；沒有任何問題時回傳 undefined
+ */
+function formatQuality(entries: Entry[], today: Date): string | undefined {
+  const lines: string[] = []
+
+  for (const s of findLongSleeps(entries)) {
+    lines.push(
+      `- 疑似填錯：${s.date} 睡眠 ${s.hours} 小時（${s.bedtime} 入睡、${s.wakeTime} 起床），可能是上午／下午填反`,
+    )
+  }
+
+  const todayDate = toDateString(today)
+  const missing = new Map<string, string[]>()
+  for (const entry of entries) {
+    if (entry.date === todayDate) continue
+    for (const label of missingFields(entry)) {
+      missing.set(label, [...(missing.get(label) ?? []), entry.date])
+    }
+  }
+  for (const [label, dates] of missing) {
+    lines.push(`- 沒填：${label} ${dates.length} 天（${formatDates(dates.sort())}）`)
+  }
+
+  return lines.length > 0
+    ? `# 資料品質備註\n以下是自動檢查出的問題。請不要把「疑似填錯」的數值當作真實數據，並在回答中提醒我補正；沒填的日子請不要推測數值。\n${lines.join('\n')}`
+    : undefined
+}
+
 function formatCondition(condition: Condition): string {
   const details = [
     condition.since ? `${condition.since} 起` : undefined,
@@ -110,11 +146,13 @@ export function buildAnalysisPrompt(
   const sorted = [...entries].sort((a, b) => a.date.localeCompare(b.date))
   const range = `${sorted[0].date} ～ ${sorted[sorted.length - 1].date}（共 ${sorted.length} 天有紀錄）`
   const profileSection = formatProfile(profile, today)
+  const qualitySection = formatQuality(sorted, today)
   return [
     INSTRUCTIONS,
     ...(profileSection ? [profileSection] : []),
     ...(conditions.length > 0 ? [`# 已知疾病\n${conditions.map(formatCondition).join('\n')}`] : []),
     `# 紀錄期間\n${range}`,
+    ...(qualitySection ? [qualitySection] : []),
     '# 每日紀錄',
     sorted.map(formatEntry).join('\n\n'),
   ].join('\n\n')

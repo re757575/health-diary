@@ -65,6 +65,59 @@ describe('buildAnalysisPrompt', () => {
     expect(prompt).toContain('- 症狀：輕微腹脹')
   })
 
+  describe('資料品質備註', () => {
+    const today = new Date(2026, 9, 31)
+    const complete = {
+      weightKg: 68,
+      waterMl: 2000,
+      mood: 3,
+      sleep: { bedtime: '23:30', wakeTime: '07:00' },
+    }
+
+    it('疑似填錯的睡眠時數與漏填的欄位，列在每日紀錄之前', () => {
+      const prompt = buildAnalysisPrompt(
+        [
+          entry('2026-10-28', { ...complete, sleep: { bedtime: '11:50', wakeTime: '07:40' } }),
+          entry('2026-10-29', { ...complete, weightKg: undefined }),
+          entry('2026-10-30', { ...complete, weightKg: undefined, waterMl: undefined }),
+        ],
+        { today },
+      )
+      expect(prompt).toContain('# 資料品質備註')
+      expect(prompt).toContain(
+        '- 疑似填錯：2026-10-28 睡眠 19.8 小時（11:50 入睡、07:40 起床），可能是上午／下午填反',
+      )
+      expect(prompt).toContain('- 沒填：體重 2 天（2026-10-29、2026-10-30）')
+      expect(prompt).toContain('- 沒填：飲水 1 天（2026-10-30）')
+      expect(prompt).not.toContain('- 沒填：心情')
+      expect(prompt.indexOf('# 資料品質備註')).toBeLessThan(prompt.indexOf('# 每日紀錄'))
+    })
+
+    it('資料都沒問題時不加這一段', () => {
+      const prompt = buildAnalysisPrompt([entry('2026-10-28', complete)], { today })
+      expect(prompt).not.toContain('資料品質備註')
+    })
+
+    it('今天的紀錄可能還在填，不算漏填；但睡眠時數有問題照樣標出', () => {
+      const prompt = buildAnalysisPrompt(
+        [entry('2026-10-31', { sleep: { bedtime: '11:30', wakeTime: '07:10' } })],
+        { today },
+      )
+      expect(prompt).not.toContain('- 沒填：')
+      expect(prompt).toContain('疑似填錯：2026-10-31')
+    })
+
+    it('漏填的日子太多時只列前五個，其餘用「等」帶過', () => {
+      const days = ['01', '02', '03', '04', '05', '06', '07'].map((d) =>
+        entry(`2026-10-${d}`, { ...complete, mood: undefined }),
+      )
+      const prompt = buildAnalysisPrompt(days, { today })
+      expect(prompt).toContain(
+        '- 沒填：心情 7 天（2026-10-01、2026-10-02、2026-10-03、2026-10-04、2026-10-05 等）',
+      )
+    })
+  })
+
   it('運動分鐘與當日狀況標籤', () => {
     const prompt = buildAnalysisPrompt([
       entry('2026-10-28', { exerciseMinutes: 120, tags: ['空氣品質差', '久坐'] }),

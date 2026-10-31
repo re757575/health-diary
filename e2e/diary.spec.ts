@@ -357,3 +357,32 @@ test('運動與今天的狀況：填寫後重新整理仍在，自訂標籤隔�
   await expect(prompt).toContainText('- 運動：120 分鐘')
   await expect(prompt).toContainText('- 當日狀況：空氣品質差、久坐、出差')
 })
+
+test('AI 提示詞的資料品質備註：標出疑似填錯的睡眠與漏填的欄位', async ({ page }) => {
+  await page.goto('./')
+
+  // 今天：入睡誤填成上午，確認後儲存
+  await page.getByLabel('入睡時間').fill('11:50')
+  await page.getByLabel('起床時間').fill('07:40')
+  await page.getByRole('button', { name: '儲存', exact: true }).click()
+  await page.getByRole('button', { name: '睡眠 19.8 小時無誤，儲存' }).click()
+  await expect(page.getByText(/已儲存 \d{4}-\d{2}-\d{2} 的紀錄/)).toBeVisible()
+
+  // 前一天：只填體重，其餘核心欄位算漏填
+  await page.getByRole('button', { name: '前一天', exact: true }).click()
+  await page.getByLabel('體重（kg）').fill('68')
+  await page.getByRole('button', { name: '儲存', exact: true }).click()
+  await expect(page.getByText(/已儲存 \d{4}-\d{2}-\d{2} 的紀錄/)).toBeVisible()
+  const yesterday = await page.getByLabel('日期').inputValue()
+
+  await openTab(page, '設定')
+  await page.getByRole('button', { name: '產生 AI 提示詞' }).click()
+  const prompt = page.getByLabel('提示詞')
+  await expect(prompt).toContainText('# 資料品質備註')
+  await expect(prompt).toContainText('疑似填錯：')
+  await expect(prompt).toContainText('睡眠 19.8 小時（11:50 入睡、07:40 起床）')
+  // 前一天漏填；今天的紀錄還可能在填，不列入
+  await expect(prompt).toContainText(`- 沒填：飲水 1 天（${yesterday}）`)
+  await expect(prompt).toContainText(`- 沒填：心情 1 天（${yesterday}）`)
+  await expect(prompt).not.toContainText('體重 1 天')
+})
