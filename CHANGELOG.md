@@ -2,6 +2,11 @@
 
 本檔案由 [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) 依照 [Conventional Commits](https://www.conventionalcommits.org/) 規範的 commit 訊息自動產生，請勿手動編輯內容，執行 `npm run release` 即可更新。
 
+## [0.1.7](https://github.com/re757575/health-diary/compare/v0.1.6...v0.1.7) (2026-10-31)
+
+### Bug Fixes
+
+* **ui:** 修正手機上被截斷的按鈕與換行混亂的表格，並淡化刪除按鈕 ([69ceb59](https://github.com/re757575/health-diary/commit/69ceb5996992b457c6f3eacf8da3922dc1903b74))
 ## [0.1.6](https://github.com/re757575/health-diary/compare/v0.1.5...v0.1.6) (2026-10-31)
 
 ### Features
