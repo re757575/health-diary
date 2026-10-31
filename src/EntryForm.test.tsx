@@ -1,7 +1,8 @@
-import { screen, within } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { db } from '@/data/db'
+import { loadDraft, saveDraft } from '@/data/draft'
 import { getEntry, saveEntry } from '@/data/repository'
 import { BRISTOL_DESCRIPTIONS, MOOD_DESCRIPTIONS, SLEEP_QUALITY_DESCRIPTIONS } from '@/domain/entry'
 import { emptyForm } from '@/domain/form'
@@ -299,6 +300,10 @@ describe('EntryForm：快速輸入', () => {
       renderForm()
 
       await user.click(copy())
+      // 帶入要先讀前一天的紀錄（非同步），等結果訊息出來再檢查
+      await waitFor(() =>
+        expect(screen.getByRole('status')).toHaveTextContent('已帶入 2026-10-28 的 2 個餐別'),
+      )
 
       expect(screen.getByLabelText('早餐')).toHaveValue('豆漿 蛋餅')
       expect(screen.getByLabelText('晚餐')).toHaveValue('白飯 青菜')
@@ -306,7 +311,6 @@ describe('EntryForm：快速輸入', () => {
       expect(screen.getByLabelText('體重（kg）')).toHaveValue(null)
       expect(screen.getByLabelText('飲水（ml）')).toHaveValue(null)
       expect(screen.queryByLabelText('時間')).not.toBeInTheDocument()
-      expect(screen.getByRole('status')).toHaveTextContent('已帶入 2026-10-28 的 2 個餐別')
       // 帶入只是填進表單，按儲存才會寫入
       expect(await getEntry(DATE)).toBeUndefined()
     })
@@ -325,10 +329,12 @@ describe('EntryForm：快速輸入', () => {
       await user.type(screen.getByLabelText('早餐'), '今天的早餐')
 
       await user.click(copy())
+      await waitFor(() =>
+        expect(screen.getByRole('status')).toHaveTextContent('已帶入 2026-10-28 的 1 個餐別'),
+      )
 
       expect(screen.getByLabelText('早餐')).toHaveValue('今天的早餐')
       expect(screen.getByLabelText('午餐')).toHaveValue('昨天的午餐')
-      expect(screen.getByRole('status')).toHaveTextContent('已帶入 2026-10-28 的 1 個餐別')
     })
 
     it('所有餐別都已有內容時不帶入，並說明原因', async () => {
@@ -342,9 +348,11 @@ describe('EntryForm：快速輸入', () => {
       await user.type(screen.getByLabelText('早餐'), '今天的早餐')
 
       await user.click(copy())
+      await waitFor(() =>
+        expect(screen.getByRole('status')).toHaveTextContent('餐點欄位都已有內容，沒有帶入'),
+      )
 
       expect(screen.getByLabelText('早餐')).toHaveValue('今天的早餐')
-      expect(screen.getByRole('status')).toHaveTextContent('餐點欄位都已有內容，沒有帶入')
     })
 
     it('前一天沒有紀錄，或只有體重沒有餐點時，說明沒有可帶入的餐點', async () => {
@@ -352,10 +360,16 @@ describe('EntryForm：快速輸入', () => {
       renderForm()
 
       await user.click(copy())
+      await waitFor(() =>
+        expect(screen.getByRole('status')).toHaveTextContent('2026-10-28 沒有餐點紀錄'),
+      )
       expect(screen.getByRole('status')).toHaveTextContent('2026-10-28 沒有餐點紀錄')
 
       await saveEntry({ date: '2026-10-28', weightKg: 68, meals: [], bowel: [] })
       await user.click(copy())
+      await waitFor(() =>
+        expect(screen.getByRole('status')).toHaveTextContent('2026-10-28 沒有餐點紀錄'),
+      )
       expect(screen.getByRole('status')).toHaveTextContent('2026-10-28 沒有餐點紀錄')
       expect(screen.getByLabelText('早餐')).toHaveValue('')
     })
@@ -641,5 +655,48 @@ describe('EntryForm：體重可能打錯', () => {
 
     await user.type(screen.getByLabelText('體重（kg）'), '7')
     expect(screen.getByText('體重 7 kg 不太像正常的數值，是不是打錯了？')).toBeInTheDocument()
+  })
+})
+
+describe('EntryForm：草稿', () => {
+  it('打字就存成草稿；重新開啟同一天會還原並提示，儲存後草稿清掉', async () => {
+    const user = userEvent.setup()
+    const { unmount } = renderForm()
+    await user.type(screen.getByLabelText('早餐'), '燕麥')
+    expect(loadDraft(DATE)?.form.meals.breakfast).toBe('燕麥')
+    unmount()
+
+    renderForm()
+    expect(screen.getByLabelText('早餐')).toHaveValue('燕麥')
+    expect(screen.getByRole('region', { name: '還原的草稿' })).toHaveTextContent(
+      '已還原上次沒儲存的內容',
+    )
+
+    await user.click(screen.getByRole('button', { name: '儲存' }))
+    await screen.findByText(`已儲存 ${DATE} 的紀錄`)
+    expect(screen.queryByRole('region', { name: '還原的草稿' })).not.toBeInTheDocument()
+    expect((await getEntry(DATE))?.meals).toEqual([{ type: 'breakfast', description: '燕麥' }])
+  })
+
+  it('按「捨棄」回到已存的內容，草稿也清掉', async () => {
+    const user = userEvent.setup()
+    saveDraft({ ...emptyForm(DATE), weightKg: '70' })
+    renderForm()
+    expect(screen.getByLabelText('體重（kg）')).toHaveValue(70)
+
+    await user.click(screen.getByRole('button', { name: '捨棄' }))
+
+    expect(screen.getByLabelText('體重（kg）')).toHaveValue(null)
+    expect(screen.queryByRole('region', { name: '還原的草稿' })).not.toBeInTheDocument()
+    expect(loadDraft(DATE)).toBeUndefined()
+  })
+
+  it('草稿和已存的內容一樣時不還原、不提示；別天的草稿不會跑到這天', () => {
+    saveDraft({ ...emptyForm(DATE), weightKg: '70' })
+    saveDraft({ ...emptyForm('2026-10-28'), notes: '別天' })
+    render(<EntryForm initial={{ ...emptyForm(DATE), weightKg: '70' }} onDateChange={() => {}} />)
+
+    expect(screen.queryByRole('region', { name: '還原的草稿' })).not.toBeInTheDocument()
+    expect(screen.getByLabelText('備註')).toHaveValue('')
   })
 })

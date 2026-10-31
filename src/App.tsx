@@ -1,6 +1,7 @@
 import { Box, Container, Stack, Tabs, Title } from '@mantine/core'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useEffect, useMemo, useState } from 'react'
+import { clearDraft } from '@/data/draft'
 import { getEntry, getLastBackupAt, getProfile, listEntries } from '@/data/repository'
 import { backupStatus } from '@/domain/backup'
 import { emptyForm, entryToForm, shiftDate, toDateString } from '@/domain/form'
@@ -63,13 +64,6 @@ export default function App() {
     return () => document.removeEventListener('visibilitychange', applyWhenHidden)
   }, [updateReady, dirty, applyUpdate])
 
-  function handleUpdateNow() {
-    if (dirty && !window.confirm('更新會重新載入頁面，尚未儲存的修改會遺失。確定要現在更新嗎？')) {
-      return
-    }
-    applyUpdate()
-  }
-
   // App 開著的那天。安裝成 App 後常整晚留在背景，隔天回到前景時要換成新的今天，
   // 否則會把紀錄寫進前一天
   const [today, setToday] = useState(() => toDateString(new Date()))
@@ -92,8 +86,9 @@ export default function App() {
     if (dirty && !window.confirm(`${date} 有尚未儲存的修改，切換日期後會遺失。確定要切換嗎？`)) {
       return false
     }
+    // 修改隨著舊的表單一起捨棄（草稿也清掉，不然回到那天又會還原）；新的那天載入後表單會再回報
+    if (dirty) clearDraft(date)
     setDate(next)
-    // 修改隨著舊的表單一起捨棄；新的那天載入後表單會再回報
     setDirty(false)
     return true
   }
@@ -123,7 +118,7 @@ export default function App() {
 
       {updateReady && (
         <Box mb="sm">
-          <UpdateNotice dirty={dirty} onUpdate={handleUpdateNow} />
+          <UpdateNotice dirty={dirty} onUpdate={applyUpdate} />
         </Box>
       )}
 

@@ -198,9 +198,10 @@ test('睡眠時數：即時顯示；超過 12 小時要確認、不畫進趨勢�
   await page.getByRole('button', { name: '儲存', exact: true }).click()
   await expect(page.getByRole('status')).toContainText('請確認入睡與起床時間')
 
-  // 第一次沒有寫入：重新整理後欄位是空的
+  // 第一次沒有寫入：重新整理後的內容是從草稿還原的，不是已存的紀錄
   await page.reload()
-  await expect(page.getByLabel('入睡時間')).toHaveValue('')
+  await expect(page.getByRole('region', { name: '還原的草稿' })).toBeVisible()
+  await expect(page.getByLabel('入睡時間')).toHaveValue('11:50')
 
   // 時間確實是這樣（例如夜班）：確認後才儲存
   await page.getByLabel('入睡時間').fill('11:50')
@@ -521,4 +522,26 @@ test('可安裝的 PWA：有 manifest 與圖示，service worker 接手後離線
   await page.getByLabel('體重（kg）').fill('66')
   await page.getByRole('button', { name: '儲存', exact: true }).click()
   await expect(page.getByText(/已儲存 \d{4}-\d{2}-\d{2} 的紀錄/)).toBeVisible()
+})
+
+test('草稿：沒儲存就被關掉（重新整理），再開啟時還原；捨棄後回到空白', async ({ page }) => {
+  await page.goto('./')
+  await page.getByLabel('早餐').fill('燕麥奶加香蕉')
+  await page.getByLabel('體重（kg）').fill('70')
+
+  // 模擬切到別的 App 時被系統關掉：直接重新載入，不經過儲存
+  page.once('dialog', (dialog) => dialog.accept())
+  await page.reload()
+
+  await expect(page.getByRole('region', { name: '還原的草稿' })).toContainText(
+    '已還原上次沒儲存的內容',
+  )
+  await expect(page.getByLabel('早餐')).toHaveValue('燕麥奶加香蕉')
+  await expect(page.getByLabel('體重（kg）')).toHaveValue('70')
+
+  await page.getByRole('button', { name: '捨棄' }).click()
+  await expect(page.getByLabel('早餐')).toHaveValue('')
+  await page.reload()
+  await expect(page.getByRole('region', { name: '還原的草稿' })).toHaveCount(0)
+  await expect(page.getByLabel('早餐')).toHaveValue('')
 })

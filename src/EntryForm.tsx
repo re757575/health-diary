@@ -10,6 +10,7 @@ import {
   TextInput,
 } from '@mantine/core'
 import { useEffect, useState, type FormEvent } from 'react'
+import { clearDraft, loadDraft, saveDraft, type Draft } from '@/data/draft'
 import { getEntry, saveEntry } from '@/data/repository'
 import {
   BRISTOL_DESCRIPTIONS,
@@ -30,6 +31,7 @@ import {
   formToEntry,
   isSameEntry,
   shiftDate,
+  toTimeString,
   type BowelFormValues,
   type FormValues,
 } from '@/domain/form'
@@ -76,7 +78,15 @@ export function EntryForm({
   knownTags = PRESET_TAGS,
   previousWeight,
 }: Props) {
-  const [form, setForm] = useState(initial)
+  // 上次沒儲存就離開（例如切到別的 App 被系統關掉）的內容；和已存的不同才還原。
+  // 合併空表單是為了補上舊版草稿沒有的欄位
+  const [restored, setRestored] = useState<Draft | undefined>(() => {
+    const draft = loadDraft(initial.date)
+    if (!draft) return undefined
+    const form = { ...emptyForm(initial.date), ...draft.form, date: initial.date }
+    return isSameEntry(form, initial) ? undefined : { ...draft, form }
+  })
+  const [form, setForm] = useState(() => restored?.form ?? initial)
   // 這天的紀錄在別處被改掉（刪除、復原、匯入備份）時，上層會傳來新的 initial：
   // 沒有未儲存的修改就換成新的內容；有修改則保留使用者的輸入（此時會算成有未儲存的修改）
   const [shownInitial, setShownInitial] = useState(initial)
@@ -119,6 +129,18 @@ export function EntryForm({
   useEffect(() => {
     onDirtyChange?.(dirty)
   }, [dirty, onDirtyChange])
+
+  // 有修改就隨時存成草稿；存檔後（或改回原樣）就清掉
+  useEffect(() => {
+    if (dirty) saveDraft(form)
+    else clearDraft(form.date)
+  }, [form, dirty])
+
+  function discardRestored() {
+    setForm(initial)
+    setRestored(undefined)
+    clearDraft(initial.date)
+  }
 
   const set = <K extends keyof FormValues>(key: K, value: FormValues[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }))
@@ -165,6 +187,7 @@ export function EntryForm({
       return
     }
     await saveEntry(parsed.data)
+    setRestored(undefined)
     setStatus(`已儲存 ${parsed.data.date} 的紀錄`)
   }
 
@@ -181,6 +204,31 @@ export function EntryForm({
   return (
     <form onSubmit={handleSubmit}>
       <Stack gap="sm">
+        {restored && (
+          <Group
+            component="section"
+            aria-label="還原的草稿"
+            justify="space-between"
+            wrap="nowrap"
+            gap="xs"
+            p="xs"
+            bg="var(--mantine-color-default-hover)"
+            style={{ borderRadius: 'var(--mantine-radius-md)' }}
+          >
+            <Text size="sm">
+              已還原上次沒儲存的內容（{toTimeString(new Date(restored.savedAt))}），記得儲存
+            </Text>
+            <Button
+              type="button"
+              variant="subtle"
+              size="compact-sm"
+              style={{ flexShrink: 0 }}
+              onClick={discardRestored}
+            >
+              捨棄
+            </Button>
+          </Group>
+        )}
         <Group gap="xs" align="flex-end" wrap="nowrap">
           <ActionIcon
             type="button"

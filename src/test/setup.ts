@@ -6,6 +6,9 @@ import { afterEach } from 'vitest'
 // vitest 未開 globals，RTL 不會自動 cleanup，需手動在每個測試後卸載
 afterEach(cleanup)
 
+// 表單草稿存在 localStorage，不清掉的話上一個測試打的字會被下一個測試還原
+afterEach(() => localStorage.clear())
+
 // jsdom 沒有實作 Mantine 會用到的瀏覽器 API
 window.matchMedia ??= (query: string) =>
   ({

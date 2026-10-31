@@ -3,6 +3,7 @@ import { render } from '@/test/render'
 import userEvent, { type UserEvent } from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { db } from '@/data/db'
+import { loadDraft } from '@/data/draft'
 import { getProfile } from '@/data/repository'
 import { serializeBackup } from '@/domain/backup'
 import type { Entry } from '@/domain/entry'
@@ -417,10 +418,10 @@ describe('新版本', () => {
     expect(appUpdate.applyUpdate).toHaveBeenCalledTimes(1)
   })
 
-  it('有未儲存的修改時，切到背景不更新；按「更新」要先確認', async () => {
+  it('有未儲存的修改時，切到背景不自動更新；手動更新不用確認，修改已存成草稿', async () => {
     const user = userEvent.setup()
     appUpdate.updateReady = true
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
+    const confirm = vi.spyOn(window, 'confirm')
     render(<App />)
     await user.type(await screen.findByLabelText('體重（kg）'), '70')
 
@@ -429,14 +430,11 @@ describe('新版本', () => {
     setVisibility('visible')
 
     const notice = screen.getByRole('region', { name: '新版本' })
-    expect(notice).toHaveTextContent('請先儲存再更新')
+    expect(notice).toHaveTextContent('重新開啟後會自動還原')
     await user.click(within(notice).getByRole('button', { name: '更新' }))
-    expect(confirm).toHaveBeenCalled()
-    expect(appUpdate.applyUpdate).not.toHaveBeenCalled()
-
-    confirm.mockReturnValue(true)
-    await user.click(within(notice).getByRole('button', { name: '更新' }))
+    expect(confirm).not.toHaveBeenCalled()
     expect(appUpdate.applyUpdate).toHaveBeenCalledTimes(1)
+    expect(loadDraft(toDateString(new Date()))?.form.weightKg).toBe('70')
     confirm.mockRestore()
   })
 })
@@ -491,6 +489,8 @@ describe('切換日期', () => {
       await waitFor(() => expect(screen.getByLabelText('日期')).toHaveValue(yesterday))
       expect(screen.getByLabelText('體重（kg）')).toHaveValue(null)
       expect(await db.entries.count()).toBe(0)
+      // 捨棄的修改不留草稿，回到那天不會又還原
+      expect(loadDraft(today)).toBeUndefined()
       confirm.mockRestore()
     })
 
