@@ -183,3 +183,27 @@ describe('isSameEntry', () => {
     expect(isSameEntry(base, { ...base, weightKg: '' })).toBe(true)
   })
 })
+
+describe('當天沒有排便', () => {
+  it('勾了且沒有排便紀錄時存成 noBowel，載入表單後仍是勾選', () => {
+    const form = { ...emptyForm('2026-10-28'), noBowel: true }
+    const entry = formToEntry(form)
+    expect(entry.noBowel).toBe(true)
+    expect(entrySchema.parse(entry)).toEqual(entry)
+    expect(entryToForm(entry).noBowel).toBe(true)
+  })
+
+  it('有排便紀錄時不算數；只有全空的排便列不算紀錄', () => {
+    const base = { ...emptyForm('2026-10-28'), noBowel: true }
+    expect(
+      formToEntry({ ...base, bowel: [{ time: '08:00', bristol: '', note: '' }] }).noBowel,
+    ).toBeUndefined()
+    expect(formToEntry({ ...base, bowel: [{ time: '', bristol: '', note: '' }] }).noBowel).toBe(
+      true,
+    )
+  })
+
+  it('舊紀錄沒有 noBowel，載入表單時是沒勾', () => {
+    expect(entryToForm({ date: '2026-10-28', meals: [], bowel: [] }).noBowel).toBe(false)
+  })
+})

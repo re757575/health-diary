@@ -31,6 +31,8 @@ class HealthDiaryDb extends Dexie {
     this.version(3).stores({ entries: 'date', conditions: 'id', profile: 'id' })
     // v4：新增 meta 資料表，記錄上次匯出備份的時間。只新增資料表，既有資料不受影響
     this.version(4).stores({ entries: 'date', conditions: 'id', profile: 'id', meta: 'key' })
+    // v5：紀錄新增選填的 noBowel（確認當天沒有排便）。沒有新資料表或索引，舊資料不需要轉換
+    this.version(5).stores({ entries: 'date', conditions: 'id', profile: 'id', meta: 'key' })
   }
 }
 

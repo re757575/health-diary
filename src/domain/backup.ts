@@ -7,14 +7,15 @@ import { daysBetween } from './trend'
 
 export const BACKUP_APP = 'health-diary'
 /**
- * v1 只有 entries；v2 新增 conditions 與 profile；v3 的紀錄多了 symptomItems（症狀與嚴重程度）、exerciseMinutes 與 tags。
- * 匯入時三個版本都接受：舊備份沒有的欄位都是選填
+ * v1 只有 entries；v2 新增 conditions 與 profile；v3 的紀錄多了 symptomItems（症狀與嚴重程度）、exerciseMinutes 與 tags；
+ * v4 的紀錄多了 noBowel（確認當天沒有排便）。
+ * 匯入時各版本都接受：舊備份沒有的欄位都是選填
  */
-export const BACKUP_VERSION = 3
+export const BACKUP_VERSION = 4
 
 const backupSchema = z.object({
   app: z.literal(BACKUP_APP),
-  version: z.union([z.literal(1), z.literal(2), z.literal(3)]),
+  version: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4)]),
   exportedAt: z.string(),
   entries: z.array(entrySchema),
   // 以下欄位 v1 備份沒有

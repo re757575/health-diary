@@ -176,7 +176,12 @@ describe('buildAnalysisPrompt', () => {
     expect(prompt).not.toContain('歲')
   })
 
-  it('沒有排便紀錄時明確標示 0 次，讓 AI 知道是沒排便而不是漏記', () => {
-    expect(buildAnalysisPrompt([entry('2026-10-28')])).toContain('- 排便：0 次')
+  it('確認當天沒有排便才寫 0 次；沒有排便紀錄也沒確認時標示未記錄，不讓 AI 當成便秘', () => {
+    expect(buildAnalysisPrompt([entry('2026-10-28', { noBowel: true })])).toContain(
+      '- 排便：0 次（確認當天沒有排便）',
+    )
+    const unknown = buildAnalysisPrompt([entry('2026-10-28')])
+    expect(unknown).toContain('- 排便：未記錄')
+    expect(unknown).not.toContain('0 次')
   })
 })

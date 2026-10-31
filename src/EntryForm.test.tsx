@@ -551,3 +551,27 @@ describe('EntryForm：運動與今天的狀況', () => {
     expect(tagButton('出差')).toHaveAttribute('aria-pressed', 'true')
   })
 })
+
+describe('EntryForm：當天沒有排便', () => {
+  it('勾選後存檔記成 noBowel；新增排便後這個選項消失並取消', async () => {
+    const user = userEvent.setup()
+    renderForm()
+
+    const noBowel = screen.getByRole('button', { name: '當天沒有排便' })
+    expect(noBowel).toHaveAttribute('aria-pressed', 'false')
+    await user.click(noBowel)
+    expect(noBowel).toHaveAttribute('aria-pressed', 'true')
+    await user.click(screen.getByRole('button', { name: '儲存' }))
+    await screen.findByText(`已儲存 ${DATE} 的紀錄`)
+    expect((await getEntry(DATE))?.noBowel).toBe(true)
+
+    await user.click(screen.getByRole('button', { name: '新增排便' }))
+    expect(screen.queryByRole('button', { name: '當天沒有排便' })).not.toBeInTheDocument()
+    await user.click(option('布里斯托（1–7）', 4))
+    await user.click(screen.getByRole('button', { name: '儲存' }))
+    await screen.findByText(`已儲存 ${DATE} 的紀錄`)
+    const entry = await getEntry(DATE)
+    expect(entry?.noBowel).toBeUndefined()
+    expect(entry?.bowel).toHaveLength(1)
+  })
+})

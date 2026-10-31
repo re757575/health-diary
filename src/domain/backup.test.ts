@@ -67,7 +67,7 @@ describe('備份匯出入', () => {
     }
     const text = serializeBackup(data)
     expect(JSON.parse(text).version).toBe(BACKUP_VERSION)
-    expect(BACKUP_VERSION).toBe(3)
+    expect(BACKUP_VERSION).toBe(4)
     expect(parseBackup(text)).toEqual({ ok: true, ...data })
   })
 

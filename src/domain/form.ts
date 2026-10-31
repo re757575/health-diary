@@ -15,6 +15,8 @@ export interface FormValues {
   sleepQuality: string
   meals: Record<MealType, string>
   bowel: BowelFormValues[]
+  /** 確認當天沒有排便；有排便紀錄時不算數 */
+  noBowel: boolean
   waterMl: string
   exerciseMinutes: string
   tags: string[]
@@ -72,6 +74,7 @@ export function emptyForm(date: string): FormValues {
     sleepQuality: '',
     meals: { breakfast: '', lunch: '', dinner: '', snack: '' },
     bowel: [],
+    noBowel: false,
     waterMl: '',
     exerciseMinutes: '',
     tags: [],
@@ -90,6 +93,9 @@ const toText = (value: string): string | undefined =>
 
 /** 表單 → Entry：空欄位省略，全空的排便列捨棄。數值是否合法交給 entrySchema 驗證 */
 export function formToEntry(form: FormValues): Entry {
+  const bowel = form.bowel
+    .map((b) => ({ time: toText(b.time), bristol: toNumber(b.bristol), note: toText(b.note) }))
+    .filter((b) => b.time !== undefined || b.bristol !== undefined || b.note !== undefined)
   const sleep = {
     bedtime: toText(form.bedtime),
     wakeTime: toText(form.wakeTime),
@@ -105,9 +111,8 @@ export function formToEntry(form: FormValues): Entry {
       const description = form.meals[type].trim()
       return description ? [{ type, description }] : []
     }),
-    bowel: form.bowel
-      .map((b) => ({ time: toText(b.time), bristol: toNumber(b.bristol), note: toText(b.note) }))
-      .filter((b) => b.time !== undefined || b.bristol !== undefined || b.note !== undefined),
+    bowel,
+    noBowel: form.noBowel && bowel.length === 0 ? true : undefined,
     waterMl: toNumber(form.waterMl),
     exerciseMinutes: toNumber(form.exerciseMinutes),
     tags: form.tags.length > 0 ? form.tags : undefined,
@@ -142,6 +147,7 @@ export function entryToForm(entry: Entry): FormValues {
       bristol: str(b.bristol),
       note: b.note ?? '',
     })),
+    noBowel: entry.noBowel ?? false,
     waterMl: str(entry.waterMl),
     exerciseMinutes: str(entry.exerciseMinutes),
     tags: entry.tags ?? [],

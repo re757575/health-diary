@@ -48,7 +48,8 @@ function formatEntry(entry: Entry): string {
     )
     lines.push(`- 排便 ${entry.bowel.length} 次：${items.join('；')}`)
   } else {
-    lines.push('- 排便：0 次')
+    // 沒有排便紀錄可能是沒排便、也可能是忘了填，只有使用者確認過才說 0 次
+    lines.push(entry.noBowel ? '- 排便：0 次（確認當天沒有排便）' : '- 排便：未記錄')
   }
 
   if (entry.mood !== undefined) lines.push(`- 心情／精神：${entry.mood}/5`)

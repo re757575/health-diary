@@ -86,6 +86,8 @@ export const entrySchema = z.object({
   sleep: sleepSchema.optional(),
   meals: z.array(mealSchema),
   bowel: z.array(bowelSchema),
+  /** 確認當天沒有排便（v4 新增）。沒有排便紀錄也沒勾這個，代表沒填，不是 0 次 */
+  noBowel: z.literal(true).optional(),
   waterMl: z.number().int().nonnegative().optional(),
   /** 自評心情／精神 1（很差）～ 5（很好） */
   mood: z.number().int().min(1).max(5).optional(),

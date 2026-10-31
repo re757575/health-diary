@@ -137,9 +137,9 @@ describe('症狀項目與資料庫升版', () => {
     expect((await getEntry('2026-10-28'))?.symptomItems).toEqual(symptomItems)
   })
 
-  it('資料庫版本是 4（v4 新增 meta 資料表）', () => {
+  it('資料庫版本是 5（v4 新增 meta 資料表，v5 紀錄新增 noBowel）', () => {
     // Dexie 內部版本是宣告的 10 倍；verno 回傳宣告的版本
-    expect(db.verno).toBe(4)
+    expect(db.verno).toBe(5)
   })
 
   it('v2 時代存的舊資料升版後仍在，沒有症狀項目', async () => {

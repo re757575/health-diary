@@ -328,13 +328,33 @@ export function EntryForm({
             </Stack>
           </Paper>
         ))}
-        <Button
-          type="button"
-          variant="light"
-          onClick={() => set('bowel', [...form.bowel, { ...EMPTY_BOWEL }])}
-        >
-          新增排便
-        </Button>
+        <Group gap="xs" grow>
+          <Button
+            type="button"
+            variant="light"
+            onClick={() =>
+              // 有了排便紀錄，「沒有排便」就不成立
+              setForm((prev) => ({
+                ...prev,
+                bowel: [...prev.bowel, { ...EMPTY_BOWEL }],
+                noBowel: false,
+              }))
+            }
+          >
+            新增排便
+          </Button>
+          {/* 沒有排便列時才能勾：分辨「確認沒排便」與「忘了填」，AI 分析時不會把漏填當成便秘 */}
+          {form.bowel.length === 0 && (
+            <Button
+              type="button"
+              variant={form.noBowel ? 'filled' : 'default'}
+              aria-pressed={form.noBowel}
+              onClick={() => set('noBowel', !form.noBowel)}
+            >
+              當天沒有排便
+            </Button>
+          )}
+        </Group>
 
         <Divider
           label="整體狀況"
