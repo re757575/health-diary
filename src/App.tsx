@@ -1,4 +1,4 @@
-import { Container, Stack, Tabs, Title } from '@mantine/core'
+import { Box, Container, Stack, Tabs, Title } from '@mantine/core'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useEffect, useMemo, useState } from 'react'
 import { getEntry, getLastBackupAt, getProfile, listEntries } from '@/data/repository'
@@ -18,6 +18,8 @@ import { MissingNotice } from './MissingNotice'
 import { ProfileForm } from './ProfileForm'
 import { Section } from './Section'
 import { TrendCharts } from './TrendCharts'
+import { UpdateNotice } from './UpdateNotice'
+import { useAppUpdate } from './useAppUpdate'
 
 type TabValue = 'today' | 'trends' | 'settings'
 
@@ -49,6 +51,24 @@ export default function App() {
     window.addEventListener('beforeunload', warn)
     return () => window.removeEventListener('beforeunload', warn)
   }, [dirty])
+
+  // 新版本裝好後，沒有未儲存的修改就趁切到背景時套用（會重新載入頁面），使用者不會看到畫面跳動
+  const { updateReady, applyUpdate } = useAppUpdate()
+  useEffect(() => {
+    if (!updateReady || dirty) return
+    function applyWhenHidden() {
+      if (document.visibilityState === 'hidden') applyUpdate()
+    }
+    document.addEventListener('visibilitychange', applyWhenHidden)
+    return () => document.removeEventListener('visibilitychange', applyWhenHidden)
+  }, [updateReady, dirty, applyUpdate])
+
+  function handleUpdateNow() {
+    if (dirty && !window.confirm('更新會重新載入頁面，尚未儲存的修改會遺失。確定要現在更新嗎？')) {
+      return
+    }
+    applyUpdate()
+  }
 
   // App 開著的那天。安裝成 App 後常整晚留在背景，隔天回到前景時要換成新的今天，
   // 否則會把紀錄寫進前一天
@@ -100,6 +120,12 @@ export default function App() {
       <Title order={1} size="h2" mb="sm">
         健康日記
       </Title>
+
+      {updateReady && (
+        <Box mb="sm">
+          <UpdateNotice dirty={dirty} onUpdate={handleUpdateNow} />
+        </Box>
+      )}
 
       <Tabs value={tab} onChange={(value) => changeTab(value as TabValue)}>
         <Tabs.List grow className="app-tabs">

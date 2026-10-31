@@ -17,11 +17,12 @@ export default defineConfig({
   base: BASE,
   plugins: [
     react(),
-    // 可安裝到主畫面、離線也能開。新版的 service worker 裝好後直接接手，但不重新整理頁面
-    // （正在填的表單不會被洗掉），下次開啟才是新版
+    // 可安裝到主畫面、離線也能開。新版 service worker 裝好後先等待，由 App（useAppUpdate）
+    // 決定何時套用：沒有未儲存的修改時趁切到背景更新，正在填的表單不會被重新整理洗掉
     VitePWA({
-      registerType: 'autoUpdate',
-      injectRegister: 'script-defer',
+      registerType: 'prompt',
+      // 由 App 透過 virtual:pwa-register/react 註冊
+      injectRegister: false,
       // 圖示由 pwa-assets.config.ts 產生；theme-color 已寫在 index.html（分淺色／深色），不要再注入
       pwaAssets: { config: true, injectThemeColor: false },
       manifest: {
@@ -36,8 +37,8 @@ export default defineConfig({
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png}'],
         // 第一次開啟就接手目前的頁面，不用重新整理一次才能離線使用
+        // （之後的新版不自動 skipWaiting，由 App 決定時機）
         clientsClaim: true,
-        skipWaiting: true,
       },
     }),
   ],

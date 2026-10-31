@@ -9,10 +9,16 @@ import type { Entry } from '@/domain/entry'
 import { shiftDate, toDateString } from '@/domain/form'
 import App from './App'
 
+// service worker 的更新狀態由測試控制；預設沒有新版本
+const appUpdate = vi.hoisted(() => ({ updateReady: false, applyUpdate: vi.fn() }))
+vi.mock('./useAppUpdate', () => ({ useAppUpdate: () => appUpdate }))
+
 const openTab = (user: UserEvent, name: '今天' | '趨勢' | '設定') =>
   user.click(screen.getByRole('tab', { name }))
 
 beforeEach(async () => {
+  appUpdate.updateReady = false
+  appUpdate.applyUpdate.mockClear()
   await Promise.all([
     db.entries.clear(),
     db.conditions.clear(),
@@ -379,6 +385,59 @@ describe('體重沒填時沿用上一次', () => {
     expect(prompt.value).toContain(
       `- 體重：71 kg（當天沒量，沿用 ${shiftDate(today, -40)} 的數值）`,
     )
+  })
+})
+
+describe('新版本', () => {
+  const setVisibility = (state: DocumentVisibilityState) => {
+    Object.defineProperty(document, 'visibilityState', { value: state, configurable: true })
+    act(() => {
+      document.dispatchEvent(new Event('visibilitychange'))
+    })
+  }
+  afterEach(() => {
+    Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true })
+  })
+
+  it('沒有新版本時不顯示提示', async () => {
+    render(<App />)
+    await screen.findByLabelText('體重（kg）')
+    expect(screen.queryByRole('region', { name: '新版本' })).not.toBeInTheDocument()
+  })
+
+  it('新版本就緒、沒有未儲存的修改：切到背景時自動更新', async () => {
+    appUpdate.updateReady = true
+    render(<App />)
+    expect(await screen.findByRole('region', { name: '新版本' })).toHaveTextContent(
+      '切到背景時會自動更新',
+    )
+
+    setVisibility('hidden')
+
+    expect(appUpdate.applyUpdate).toHaveBeenCalledTimes(1)
+  })
+
+  it('有未儲存的修改時，切到背景不更新；按「更新」要先確認', async () => {
+    const user = userEvent.setup()
+    appUpdate.updateReady = true
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
+    render(<App />)
+    await user.type(await screen.findByLabelText('體重（kg）'), '70')
+
+    setVisibility('hidden')
+    expect(appUpdate.applyUpdate).not.toHaveBeenCalled()
+    setVisibility('visible')
+
+    const notice = screen.getByRole('region', { name: '新版本' })
+    expect(notice).toHaveTextContent('請先儲存再更新')
+    await user.click(within(notice).getByRole('button', { name: '更新' }))
+    expect(confirm).toHaveBeenCalled()
+    expect(appUpdate.applyUpdate).not.toHaveBeenCalled()
+
+    confirm.mockReturnValue(true)
+    await user.click(within(notice).getByRole('button', { name: '更新' }))
+    expect(appUpdate.applyUpdate).toHaveBeenCalledTimes(1)
+    confirm.mockRestore()
   })
 })
 
