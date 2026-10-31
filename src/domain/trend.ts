@@ -44,7 +44,7 @@ export function summarizeSeries(points: TrendPoint[]): SeriesSummary {
 const DAY_MS = 24 * 60 * 60 * 1000
 
 /** 用 UTC 計算日數差，避開夏令時間造成的 23／25 小時 */
-function daysBetween(from: string, to: string): number {
+export function daysBetween(from: string, to: string): number {
   const utc = (date: string) => {
     const [y, m, d] = date.split('-').map(Number)
     return Date.UTC(y, m - 1, d)
@@ -53,7 +53,7 @@ function daysBetween(from: string, to: string): number {
 }
 
 /** 最近 `days` 天（含 `today`）的起訖日與落在區間內的紀錄（由舊到新） */
-function recentWindow(entries: Entry[], today: Date, days: number) {
+export function recentWindow(entries: Entry[], today: Date, days: number) {
   const startDate = toDateString(
     new Date(today.getFullYear(), today.getMonth(), today.getDate() - (days - 1)),
   )

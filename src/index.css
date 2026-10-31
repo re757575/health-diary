@@ -65,6 +65,7 @@ textarea.mantine-Textarea-input {
   --series-weight: #2a78d6;
   --series-sleep: #eb6834;
   --series-symptom: #7a5ccf;
+  --series-mood: #2f9e6e;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -72,6 +73,7 @@ textarea.mantine-Textarea-input {
     --series-weight: #3987e5;
     --series-sleep: #d95926;
     --series-symptom: #9b7be0;
+    --series-mood: #45b383;
   }
 }
 
@@ -123,6 +125,10 @@ textarea.mantine-Textarea-input {
 
 .series-symptom {
   --series: var(--series-symptom);
+}
+
+.series-mood {
+  --series: var(--series-mood);
 }
 
 .trend-line {
@@ -220,4 +226,14 @@ textarea.mantine-Textarea-input {
   margin-top: 0.5rem;
   font-size: 0.75rem;
   color: var(--mantine-color-dimmed);
+}
+
+/* 每日一覽的色塊：顏色深淺由 fill-opacity 決定；有紀錄但沒有症狀的日子用淡底色，和留白（沒紀錄）區分 */
+.strip-cell {
+  fill: var(--series);
+}
+
+.strip-cell.strip-none {
+  fill: currentColor;
+  fill-opacity: 0.12;
 }

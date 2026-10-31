@@ -144,3 +144,81 @@ describe('TrendCharts：症狀出現天數', () => {
     )
   })
 })
+
+describe('TrendCharts：睡眠、心情與症狀對照', () => {
+  const day = (n: number, hours: 5 | 8, mood: number, level: 0 | 2) =>
+    entry(`2026-10-${String(n).padStart(2, '0')}`, {
+      sleep:
+        hours === 5
+          ? { bedtime: '01:00', wakeTime: '06:00' }
+          : { bedtime: '23:00', wakeTime: '07:00' },
+      mood,
+      symptomItems: level === 0 ? [] : [{ name: '頭痛', severity: level }],
+    })
+
+  it('沒有睡眠、心情、症狀的紀錄時顯示說明', () => {
+    render(<TrendCharts entries={[entry('2026-10-28', { weightKg: 70 })]} today={today} />)
+
+    expect(screen.getByRole('figure', { name: '睡眠、心情與症狀對照' })).toHaveTextContent(
+      '最近 30 天還沒有睡眠、心情或症狀的紀錄',
+    )
+  })
+
+  it('兩組各累積 3 天以上，顯示睡不夠與睡得夠的平均心情與有症狀的天數', () => {
+    render(
+      <TrendCharts
+        entries={[
+          day(20, 5, 2, 2),
+          day(21, 5, 3, 2),
+          day(22, 5, 2, 0),
+          day(23, 8, 4, 0),
+          day(24, 8, 4, 0),
+          day(25, 8, 5, 2),
+        ]}
+        today={today}
+      />,
+    )
+
+    const figure = screen.getByRole('figure', { name: '睡眠、心情與症狀對照' })
+    const rows = within(within(figure).getByRole('table', { name: '睡眠對照表' })).getAllByRole(
+      'row',
+    )
+    expect(rows.slice(1).map((r) => r.textContent)).toEqual([
+      '睡不到 6.5 小時3 天2.32／3 天',
+      '睡 6.5 小時以上3 天4.31／3 天',
+    ])
+  })
+
+  it('任一組不到 3 天時不顯示對照表，說明還差多少', () => {
+    render(
+      <TrendCharts
+        entries={[day(20, 5, 2, 2), day(21, 8, 4, 0), day(22, 8, 4, 0), day(23, 8, 4, 0)]}
+        today={today}
+      />,
+    )
+
+    const figure = screen.getByRole('figure', { name: '睡眠、心情與症狀對照' })
+    expect(within(figure).queryByRole('table', { name: '睡眠對照表' })).not.toBeInTheDocument()
+    expect(figure).toHaveTextContent(
+      '睡不到 6.5 小時（1 天）與睡 6.5 小時以上（3 天）各累積 3 天後',
+    )
+  })
+
+  it('一覽圖有名稱與天數，資料表列出每天的睡眠、心情與症狀', async () => {
+    render(
+      <TrendCharts entries={[day(27, 8, 4, 2), entry('2026-10-28', { mood: 3 })]} today={today} />,
+    )
+
+    const figure = screen.getByRole('figure', { name: '睡眠、心情與症狀對照' })
+    expect(
+      within(figure).getByRole('img', { name: '最近 30 天睡眠、心情與症狀一覽，共 2 天有紀錄' }),
+    ).toBeInTheDocument()
+    const table = within(figure).getByRole('table', { name: '睡眠、心情與症狀資料表' })
+    expect(
+      within(table)
+        .getAllByRole('row')
+        .slice(1)
+        .map((r) => r.textContent),
+    ).toEqual(['2026-10-278 小時4/5最重中', '2026-10-28—3/5沒有症狀'])
+  })
+})

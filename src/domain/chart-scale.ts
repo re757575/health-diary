@@ -62,7 +62,7 @@ export function buildLineChart({
 }
 
 /** 起點日期加上 `dayIndex` 天，格式 MM/DD（用 UTC 計算，避開夏令時間） */
-function labelOf(startDate: string, dayIndex: number): string {
+export function labelOf(startDate: string, dayIndex: number): string {
   const [y, m, d] = startDate.split('-').map(Number)
   return new Date(Date.UTC(y, m - 1, d + dayIndex)).toISOString().slice(5, 10).replace('-', '/')
 }

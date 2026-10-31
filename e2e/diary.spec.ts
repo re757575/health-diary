@@ -422,3 +422,60 @@ test('漏填提示：列出沒填完的日子，補填跳到那天，補完後�
   await expect(page.getByText(/已儲存 \d{4}-\d{2}-\d{2} 的紀錄/)).toBeVisible()
   await expect(notice).toHaveCount(0)
 })
+
+test('趨勢：睡眠對心情與症狀的對照；睡眠填錯的日子不列入', async ({ page }) => {
+  // 以今天往前數 1～6 天；前 3 天睡不夠、心情低、常有症狀，後 3 天睡得夠、心情好、沒症狀
+  const dateOf = (daysAgo: number) => {
+    const d = new Date()
+    d.setDate(d.getDate() - daysAgo)
+    const pad = (n: number) => String(n).padStart(2, '0')
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+  }
+  const short = { bedtime: '01:00', wakeTime: '06:00' }
+  const enough = { bedtime: '23:00', wakeTime: '07:00' }
+  const entry = (daysAgo: number, sleep: object, mood: number, symptomItems: object[]) => ({
+    date: dateOf(daysAgo),
+    sleep,
+    mood,
+    symptomItems,
+    meals: [],
+    bowel: [],
+  })
+  const backup = {
+    app: 'health-diary',
+    version: 3,
+    exportedAt: new Date().toISOString(),
+    conditions: [],
+    entries: [
+      entry(1, short, 2, [{ name: '頭痛', severity: 2 }]),
+      entry(2, short, 2, [{ name: '頭痛', severity: 1 }]),
+      entry(3, short, 3, []),
+      entry(4, enough, 4, []),
+      entry(5, enough, 5, []),
+      entry(6, enough, 4, [{ name: '鼻塞', severity: 1 }]),
+      // 入睡誤填成上午：不列入睡眠對照
+      entry(7, { bedtime: '11:50', wakeTime: '07:40' }, 3, []),
+    ],
+  }
+
+  await page.goto('./')
+  await openTab(page, '設定')
+  await page.getByLabel('匯入備份').setInputFiles({
+    name: 'backup.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(backup)),
+  })
+  await expect(page.getByText('已匯入 7 筆紀錄')).toBeVisible()
+
+  await openTab(page, '趨勢')
+  const figure = page.getByRole('figure', { name: '睡眠、心情與症狀對照' })
+  await expect(figure.getByRole('img', { name: /共 7 天有紀錄/ })).toBeVisible()
+  const table = figure.getByRole('table', { name: '睡眠對照表' })
+  await expect(table.getByRole('row', { name: /睡不到 6.5 小時/ })).toContainText('3 天2.32／3 天')
+  await expect(table.getByRole('row', { name: /睡 6.5 小時以上/ })).toContainText('3 天4.31／3 天')
+
+  // 資料表：填錯的那天睡眠是「—」
+  await figure.getByText('檢視資料表').click()
+  const data = figure.getByRole('table', { name: '睡眠、心情與症狀資料表' })
+  await expect(data.getByRole('row', { name: new RegExp(dateOf(7)) })).toContainText('—3/5沒有症狀')
+})

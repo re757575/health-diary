@@ -1,5 +1,16 @@
 import { Fragment, useId } from 'react'
-import { buildLineChart, type ChartBox } from '@/domain/chart-scale'
+import { buildLineChart, labelOf, type ChartBox } from '@/domain/chart-scale'
+import {
+  MIN_COMPARE_DAYS,
+  SHORT_SLEEP_HOURS,
+  buildDaily,
+  compareBySleep,
+  moodIntensity,
+  sleepIntensity,
+  symptomIntensity,
+  type Daily,
+  type SleepGroup,
+} from '@/domain/daily'
 import type { Entry } from '@/domain/entry'
 import { SEVERITY_LABELS, SYMPTOM_SEVERITIES } from '@/domain/entry'
 import {
@@ -158,6 +169,202 @@ function TrendChart({
   )
 }
 
+/** 每日一覽：三列色塊（睡眠、心情、症狀），同一天上下對齊，顏色越深代表越多／越好／越重 */
+const STRIP = {
+  width: 340,
+  rowHeight: 16,
+  rowGap: 6,
+  margin: { top: 4, right: 8, bottom: 20, left: 40 },
+}
+const STRIP_ROWS = [
+  { key: 'sleep', label: '睡眠', className: 'series-sleep' },
+  { key: 'mood', label: '心情', className: 'series-mood' },
+  { key: 'symptom', label: '症狀', className: 'series-symptom' },
+] as const
+
+const SYMPTOM_LEVEL_TEXT = [
+  '沒有症狀',
+  ...SYMPTOM_SEVERITIES.map((s) => `最重${SEVERITY_LABELS[s]}`),
+]
+
+function groupRow(label: string, group: SleepGroup) {
+  return (
+    <tr key={label}>
+      <th scope="row">{label}</th>
+      <td>{group.days} 天</td>
+      <td>{group.moodAvg ?? '—'}</td>
+      <td>{group.symptomBase > 0 ? `${group.symptomDays}／${group.symptomBase} 天` : '—'}</td>
+    </tr>
+  )
+}
+
+function DailyChart({ daily }: { daily: Daily }) {
+  const headingId = useId()
+  const { cells, startDate, days } = daily
+  const hasData = cells.some(
+    (c) => c.sleepHours !== undefined || c.mood !== undefined || c.symptomLevel !== undefined,
+  )
+
+  if (!hasData) {
+    return (
+      <figure className="trend" aria-labelledby={headingId}>
+        <h3 id={headingId}>睡眠、心情與症狀對照</h3>
+        <p>最近 {DAYS} 天還沒有睡眠、心情或症狀的紀錄</p>
+      </figure>
+    )
+  }
+
+  const { top, right, bottom, left } = STRIP.margin
+  const innerWidth = STRIP.width - left - right
+  const cellWidth = innerWidth / days
+  const rowsHeight = STRIP_ROWS.length * STRIP.rowHeight + (STRIP_ROWS.length - 1) * STRIP.rowGap
+  const height = top + rowsHeight + bottom
+  const xOf = (dayIndex: number) => left + dayIndex * cellWidth
+  const rowY = (row: number) => top + row * (STRIP.rowHeight + STRIP.rowGap)
+  // 與折線圖一樣每 7 天一個刻度，最右邊是今天
+  const xTicks = Array.from({ length: Math.floor((days - 1) / 7) + 1 }, (_, i) => days - 1 - i * 7)
+    .reverse()
+    .map((dayIndex) => ({ x: xOf(dayIndex) + cellWidth / 2, label: labelOf(startDate, dayIndex) }))
+
+  const comparison = compareBySleep(cells)
+  const comparable =
+    comparison.short.days >= MIN_COMPARE_DAYS && comparison.enough.days >= MIN_COMPARE_DAYS
+
+  return (
+    <figure className="trend" aria-labelledby={headingId}>
+      <h3 id={headingId}>睡眠、心情與症狀對照</h3>
+      <p>
+        同一天的睡眠、心情與症狀上下對齊；顏色越深代表睡得越久、心情越好、症狀越重，留白是沒有紀錄。
+      </p>
+
+      <svg
+        role="img"
+        aria-label={`最近 ${DAYS} 天睡眠、心情與症狀一覽，共 ${cells.length} 天有紀錄`}
+        viewBox={`0 0 ${STRIP.width} ${height}`}
+      >
+        {STRIP_ROWS.map((row, r) => (
+          <text
+            key={row.key}
+            className="trend-axis"
+            x={left - 6}
+            y={rowY(r) + STRIP.rowHeight / 2}
+            textAnchor="end"
+            dy="0.32em"
+          >
+            {row.label}
+          </text>
+        ))}
+        {xTicks.map((tick) => (
+          <text
+            key={tick.label}
+            className="trend-axis"
+            x={tick.x}
+            y={top + rowsHeight + 14}
+            textAnchor="middle"
+          >
+            {tick.label}
+          </text>
+        ))}
+        {cells.map((cell) => {
+          const x = xOf(cell.dayIndex) + 0.5
+          const width = cellWidth - 1
+          const rect = (
+            row: number,
+            className: string,
+            opacity: number | undefined,
+            title: string,
+          ) => (
+            <rect
+              key={`${cell.date}-${row}`}
+              className={`strip-cell ${className}`}
+              x={x}
+              y={rowY(row)}
+              width={width}
+              height={STRIP.rowHeight}
+              rx={2}
+              fillOpacity={opacity}
+            >
+              <title>{`${cell.date} · ${title}`}</title>
+            </rect>
+          )
+          return (
+            <Fragment key={cell.date}>
+              {cell.sleepHours !== undefined &&
+                rect(
+                  0,
+                  'series-sleep',
+                  sleepIntensity(cell.sleepHours),
+                  `睡 ${cell.sleepHours} 小時`,
+                )}
+              {cell.mood !== undefined &&
+                rect(1, 'series-mood', moodIntensity(cell.mood), `心情 ${cell.mood}/5`)}
+              {cell.symptomLevel !== undefined &&
+                (cell.symptomLevel === 0
+                  ? rect(2, 'strip-none', undefined, '沒有症狀')
+                  : rect(
+                      2,
+                      'series-symptom',
+                      symptomIntensity(cell.symptomLevel),
+                      `症狀${SYMPTOM_LEVEL_TEXT[cell.symptomLevel]}`,
+                    ))}
+            </Fragment>
+          )
+        })}
+      </svg>
+
+      {comparable ? (
+        <>
+          <table aria-label="睡眠對照表">
+            <thead>
+              <tr>
+                <th scope="col">分組</th>
+                <th scope="col">天數</th>
+                <th scope="col">平均心情</th>
+                <th scope="col">有症狀</th>
+              </tr>
+            </thead>
+            <tbody>
+              {groupRow(`睡不到 ${SHORT_SLEEP_HOURS} 小時`, comparison.short)}
+              {groupRow(`睡 ${SHORT_SLEEP_HOURS} 小時以上`, comparison.enough)}
+            </tbody>
+          </table>
+          <p className="trend-note">天數少的時候，差異可能只是巧合，僅供參考。</p>
+        </>
+      ) : (
+        <p className="trend-note">
+          睡不到 {SHORT_SLEEP_HOURS} 小時（{comparison.short.days} 天）與睡 {SHORT_SLEEP_HOURS}{' '}
+          小時以上（{comparison.enough.days} 天）各累積 {MIN_COMPARE_DAYS}{' '}
+          天後，才會顯示心情與症狀的對照。
+        </p>
+      )}
+
+      <details>
+        <summary>檢視資料表</summary>
+        <table aria-label="睡眠、心情與症狀資料表">
+          <thead>
+            <tr>
+              <th scope="col">日期</th>
+              <th scope="col">睡眠</th>
+              <th scope="col">心情</th>
+              <th scope="col">症狀</th>
+            </tr>
+          </thead>
+          <tbody>
+            {cells.map((c) => (
+              <tr key={c.date}>
+                <td>{c.date}</td>
+                <td>{c.sleepHours !== undefined ? `${c.sleepHours} 小時` : '—'}</td>
+                <td>{c.mood !== undefined ? `${c.mood}/5` : '—'}</td>
+                <td>{c.symptomLevel !== undefined ? SYMPTOM_LEVEL_TEXT[c.symptomLevel] : '—'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </details>
+    </figure>
+  )
+}
+
 function SymptomChart({ trend }: { trend: SymptomTrend }) {
   const headingId = useId()
   const { recordedDays, textOnlyDays, items } = trend
@@ -207,6 +414,7 @@ function SymptomChart({ trend }: { trend: SymptomTrend }) {
 export function TrendCharts({ entries, today }: Props) {
   const trends = buildTrends(entries, today, DAYS)
   const symptoms = buildSymptomTrend(entries, today, DAYS)
+  const daily = buildDaily(entries, today, DAYS)
 
   return (
     <Section title={`最近 ${DAYS} 天趨勢`}>
@@ -230,6 +438,7 @@ export function TrendCharts({ entries, today }: Props) {
         points={trends.sleepHours}
         startDate={trends.startDate}
       />
+      <DailyChart daily={daily} />
       <SymptomChart trend={symptoms} />
     </Section>
   )
