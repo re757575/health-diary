@@ -365,8 +365,11 @@ describe('體重沒填時沿用上一次', () => {
     await waitFor(() =>
       expect(screen.getByLabelText('體重（kg）')).toHaveAttribute('placeholder', '沿用 68.5'),
     )
-    for (let i = 0; i < 5; i++) await user.click(screen.getByRole('button', { name: '前一天' }))
-    await waitFor(() => expect(screen.getByLabelText('日期')).toHaveValue(shiftDate(today, -5)))
+    // 每換一天表單會重新載入，等載入完再按下一次
+    for (let i = 1; i <= 5; i++) {
+      await user.click(await screen.findByRole('button', { name: '前一天' }))
+      await waitFor(() => expect(screen.getByLabelText('日期')).toHaveValue(shiftDate(today, -i)))
+    }
     expect(screen.getByLabelText('體重（kg）')).not.toHaveAttribute('placeholder')
   })
 
@@ -605,6 +608,49 @@ describe('刪除紀錄', () => {
 
     expect(screen.getByLabelText('早餐')).toHaveValue('燕麥奶')
     expect(screen.getByLabelText('體重（kg）')).toHaveValue(70)
+  })
+})
+
+describe('資料庫寫入失敗', () => {
+  beforeEach(() => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+  })
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('刪除紀錄失敗時顯示錯誤，紀錄還在', async () => {
+    const user = userEvent.setup()
+    await db.entries.put({ date: '2026-01-02', weightKg: 65, meals: [], bowel: [] })
+    vi.spyOn(db.entries, 'delete').mockRejectedValue(new Error('Connection lost'))
+    render(<App />)
+
+    await openTab(user, '趨勢')
+    await user.click(await screen.findByRole('button', { name: '刪除 2026-01-02' }))
+
+    expect(await screen.findByText('刪除失敗，請重新整理頁面後再試一次')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '復原' })).not.toBeInTheDocument()
+  })
+
+  it('匯入失敗時顯示錯誤，資料沒有變動', async () => {
+    const user = userEvent.setup()
+    vi.spyOn(db.entries, 'bulkPut').mockRejectedValue(new Error('Connection lost'))
+    render(<App />)
+
+    const backup = serializeBackup({
+      entries: [{ date: '2026-01-02', weightKg: 65, meals: [], bowel: [] }],
+      conditions: [],
+    })
+    await openTab(user, '設定')
+    await user.upload(
+      await screen.findByLabelText('匯入備份'),
+      new File([backup], 'backup.json', { type: 'application/json' }),
+    )
+
+    expect(
+      await screen.findByText('匯入失敗，資料沒有變動，請重新整理頁面後再試一次'),
+    ).toBeInTheDocument()
+    expect(await db.entries.count()).toBe(0)
   })
 })
 

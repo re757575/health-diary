@@ -8,7 +8,7 @@ import {
   listConditions,
   listEntries,
 } from '@/data/repository'
-import { describeLastBackup, parseBackup, previewImport } from '@/domain/backup'
+import { describeLastBackup, parseBackup, previewImport, type BackupData } from '@/domain/backup'
 import { buildAnalysisPrompt, recentEntries } from '@/domain/prompt'
 import { exportBackup } from './exportBackup'
 import { Section } from './Section'
@@ -29,12 +29,16 @@ const formatDates = (dates: string[], max = 3) =>
 export function DataTools() {
   const [days, setDays] = useState(7)
   const [prompt, setPrompt] = useState('')
-  const [status, setStatus] = useStatus()
+  const [status, setStatus, tryWrite] = useStatus()
   const resetFileRef = useRef<() => void>(null)
   // 包一層物件區分「載入中」與「沒備份過」
   const lastBackup = useLiveQuery(async () => ({ at: await getLastBackupAt() }), [])
 
   async function handleExport() {
+    await tryWrite(exportAndReport, '匯出失敗')
+  }
+
+  async function exportAndReport() {
     const result = await exportBackup()
     const messages = {
       shared: '已匯出備份',
@@ -52,6 +56,11 @@ export function DataTools() {
       setStatus(`匯入失敗：${result.error}`, true)
       return
     }
+    // 所有資料表在同一個交易裡寫入，失敗時不會只匯入一半
+    await tryWrite(() => confirmAndImport(result), '匯入失敗，資料沒有變動')
+  }
+
+  async function confirmAndImport(result: BackupData) {
     // 匯入會以備份為準覆蓋同一天的紀錄；用舊備份蓋掉較新的內容就救不回來，所以先確認
     const { replaced } = previewImport(result.entries, await listEntries())
     if (
@@ -73,6 +82,10 @@ export function DataTools() {
   }
 
   async function handleGeneratePrompt() {
+    await tryWrite(generatePrompt, '讀取紀錄失敗')
+  }
+
+  async function generatePrompt() {
     const history = await listEntries()
     const entries = recentEntries(history, days, new Date())
     if (entries.length === 0) {

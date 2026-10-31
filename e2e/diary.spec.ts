@@ -534,7 +534,7 @@ test('草稿：沒儲存就被關掉（重新整理），再開啟時還原；�
   await page.reload()
 
   await expect(page.getByRole('region', { name: '還原的草稿' })).toContainText(
-    '已還原上次沒儲存的內容',
+    /已還原 \d{2}:\d{2} 沒儲存的內容/,
   )
   await expect(page.getByLabel('早餐')).toHaveValue('燕麥奶加香蕉')
   await expect(page.getByLabel('體重（kg）')).toHaveValue('70')

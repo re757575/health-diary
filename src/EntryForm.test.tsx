@@ -669,7 +669,7 @@ describe('EntryForm：草稿', () => {
     renderForm()
     expect(screen.getByLabelText('早餐')).toHaveValue('燕麥')
     expect(screen.getByRole('region', { name: '還原的草稿' })).toHaveTextContent(
-      '已還原上次沒儲存的內容',
+      /已還原 \d{2}:\d{2} 沒儲存的內容/,
     )
 
     await user.click(screen.getByRole('button', { name: '儲存' }))
@@ -698,5 +698,24 @@ describe('EntryForm：草稿', () => {
 
     expect(screen.queryByRole('region', { name: '還原的草稿' })).not.toBeInTheDocument()
     expect(screen.getByLabelText('備註')).toHaveValue('')
+  })
+})
+
+describe('EntryForm：儲存失敗', () => {
+  it('寫入資料庫失敗時顯示錯誤，輸入還在，也留有草稿', async () => {
+    const user = userEvent.setup()
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    const put = vi.spyOn(db.entries, 'put').mockRejectedValue(new Error('Connection lost'))
+    renderForm()
+
+    await user.type(screen.getByLabelText('早餐'), '燕麥')
+    await user.click(screen.getByRole('button', { name: '儲存' }))
+
+    expect(
+      await screen.findByText('儲存失敗，輸入的內容已存成草稿，請重新整理頁面後再試一次'),
+    ).toBeInTheDocument()
+    expect(screen.getByLabelText('早餐')).toHaveValue('燕麥')
+    expect(loadDraft(DATE)?.form.meals.breakfast).toBe('燕麥')
+    put.mockRestore()
   })
 })

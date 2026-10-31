@@ -30,7 +30,7 @@ export function Conditions() {
   const [form, setForm] = useState<ConditionFormValues>(emptyConditionForm)
   /** 正在編輯的疾病 id；null 代表新增 */
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [status, setStatus] = useStatus()
+  const [status, setStatus, tryWrite] = useStatus()
   /** 剛刪除的疾病，讓使用者能復原；做了別的操作就清掉 */
   const [deleted, setDeleted] = useState<Condition | null>(null)
 
@@ -58,13 +58,19 @@ export function Conditions() {
       setStatus('請填寫疾病名稱，開始時間格式需為年月', true)
       return
     }
-    await saveCondition(parsed.data)
-    setDeleted(null)
-    setStatus(`已${editingId ? '更新' : '新增'}「${parsed.data.name}」`)
-    resetForm()
+    await tryWrite(async () => {
+      await saveCondition(parsed.data)
+      setDeleted(null)
+      setStatus(`已${editingId ? '更新' : '新增'}「${parsed.data.name}」`)
+      resetForm()
+    }, '儲存失敗')
   }
 
   async function handleDelete(condition: Condition) {
+    await tryWrite(() => deleteAndOfferUndo(condition), '刪除失敗')
+  }
+
+  async function deleteAndOfferUndo(condition: Condition) {
     await deleteCondition(condition.id)
     // 正在編輯的那筆被刪掉時，不能再讓表單以舊 id 存回去
     if (editingId === condition.id) resetForm()
@@ -74,9 +80,11 @@ export function Conditions() {
 
   async function handleUndo() {
     if (!deleted) return
-    await saveCondition(deleted)
-    setDeleted(null)
-    setStatus(`已復原「${deleted.name}」`)
+    await tryWrite(async () => {
+      await saveCondition(deleted)
+      setDeleted(null)
+      setStatus(`已復原「${deleted.name}」`)
+    }, '復原失敗')
   }
 
   return (

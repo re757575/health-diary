@@ -19,7 +19,7 @@ interface Props {
 
 export function ProfileForm({ initial }: Props) {
   const [form, setForm] = useState(() => profileToForm(initial))
-  const [status, setStatus] = useStatus()
+  const [status, setStatus, tryWrite] = useStatus()
 
   // 儲存的資料被外部改動（例如匯入備份覆蓋）時，表單跟著更新；
   // 自己儲存時資料與表單一致，表單內容與提示訊息都不受影響
@@ -40,8 +40,10 @@ export function ProfileForm({ initial }: Props) {
       setStatus('身高需為 0–300 之間的數字', true)
       return
     }
-    await saveProfile(parsed.data)
-    setStatus('已儲存基本資料')
+    await tryWrite(async () => {
+      await saveProfile(parsed.data)
+      setStatus('已儲存基本資料')
+    }, '儲存失敗')
   }
 
   return (

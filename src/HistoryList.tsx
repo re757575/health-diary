@@ -16,21 +16,25 @@ interface Props {
 
 /** 「趨勢」分頁的歷史紀錄：每天一列，可以編輯或刪除，刪除後可復原 */
 export function HistoryList({ entries, editingDate, onEdit }: Props) {
-  const [status, setStatus] = useStatus()
+  const [status, setStatus, tryWrite] = useStatus()
   /** 剛刪除的紀錄，讓使用者能復原；做了別的操作就清掉 */
   const [deleted, setDeleted] = useState<Entry | null>(null)
 
   async function handleDelete(entry: Entry) {
-    await deleteEntry(entry.date)
-    setDeleted(entry)
-    setStatus(`已刪除 ${entry.date} 的紀錄`)
+    await tryWrite(async () => {
+      await deleteEntry(entry.date)
+      setDeleted(entry)
+      setStatus(`已刪除 ${entry.date} 的紀錄`)
+    }, '刪除失敗')
   }
 
   async function handleUndo() {
     if (!deleted) return
-    await saveEntry(deleted)
-    setDeleted(null)
-    setStatus(`已復原 ${deleted.date} 的紀錄`)
+    await tryWrite(async () => {
+      await saveEntry(deleted)
+      setDeleted(null)
+      setStatus(`已復原 ${deleted.date} 的紀錄`)
+    }, '復原失敗')
   }
 
   function handleEdit(date: string) {

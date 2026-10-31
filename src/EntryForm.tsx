@@ -94,7 +94,7 @@ export function EntryForm({
     setShownInitial(initial)
     if (isSameEntry(form, shownInitial)) setForm(initial)
   }
-  const [status, setStatus] = useStatus()
+  const [status, setStatus, tryWrite] = useStatus()
   // 使用者已經看過「睡太久」警告並按了確認的那組入睡／起床時間；時間一改就不算數
   const [confirmedSleep, setConfirmedSleep] = useState<string | null>(null)
 
@@ -154,6 +154,10 @@ export function EntryForm({
   // 只補還空著的餐別，不蓋掉已經打的字；其他欄位（體重、睡眠、排便、飲水…）每天不同，不帶入
   async function handleCopyMeals() {
     const previousDate = shiftDate(form.date, -1)
+    await tryWrite(() => copyMealsFrom(previousDate), '讀取前一天的餐點失敗')
+  }
+
+  async function copyMealsFrom(previousDate: string) {
     const previous = await getEntry(previousDate)
     const source = previous && entryToForm(previous).meals
     const { meals, filled } = fillEmptyMeals(form.meals, source ?? emptyMeals)
@@ -186,9 +190,12 @@ export function EntryForm({
       setStatus(`${reasons.join('；')}；沒問題請再按一次儲存`, true)
       return
     }
-    await saveEntry(parsed.data)
-    setRestored(undefined)
-    setStatus(`已儲存 ${parsed.data.date} 的紀錄`)
+    // 失敗時輸入還在畫面上，也已經存成草稿，重新整理後會還原
+    await tryWrite(async () => {
+      await saveEntry(parsed.data)
+      setRestored(undefined)
+      setStatus(`已儲存 ${parsed.data.date} 的紀錄`)
+    }, '儲存失敗，輸入的內容已存成草稿')
   }
 
   /** 有看過警告、待確認的數值時，按鈕寫出要確認的是什麼 */
@@ -215,9 +222,7 @@ export function EntryForm({
             bg="var(--mantine-color-default-hover)"
             style={{ borderRadius: 'var(--mantine-radius-md)' }}
           >
-            <Text size="sm">
-              已還原上次沒儲存的內容（{toTimeString(new Date(restored.savedAt))}），記得儲存
-            </Text>
+            <Text size="sm">已還原 {toTimeString(new Date(restored.savedAt))} 沒儲存的內容</Text>
             <Button
               type="button"
               variant="subtle"
