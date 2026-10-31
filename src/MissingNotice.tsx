@@ -47,6 +47,7 @@ export function MissingNotice({ days, currentDate, onFill }: Props) {
               <Button
                 variant="light"
                 size="compact-sm"
+                style={{ flexShrink: 0 }}
                 aria-label={`補填 ${date}`}
                 onClick={() => onFill(date)}
               >

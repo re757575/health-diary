@@ -32,7 +32,8 @@ export function BackupNotice({ daysSince }: Props) {
               : '資料只存在這台裝置，換手機或被瀏覽器清除就會遺失'}
           </Text>
         </div>
-        <Button variant="light" size="compact-sm" onClick={handleExport}>
+        {/* 不讓說明文字把按鈕擠窄，否則窄螢幕上按鈕文字會被截斷 */}
+        <Button variant="light" size="compact-sm" style={{ flexShrink: 0 }} onClick={handleExport}>
           匯出備份
         </Button>
       </Group>

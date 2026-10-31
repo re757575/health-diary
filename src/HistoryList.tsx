@@ -76,9 +76,12 @@ export function HistoryList({ entries, editingDate, onEdit }: Props) {
                   >
                     編輯
                   </Button>
+                  {/* 每一列都有，不用底色，避免整排紅色搶走注意力；誤刪可以復原。
+                      深色模式下 subtle 的預設字色幾乎是白色，改用主題的紅色文字色 */}
                   <Button
-                    variant="light"
+                    variant="subtle"
                     color="red"
+                    c="red"
                     size="compact-md"
                     aria-label={`刪除 ${entry.date}`}
                     onClick={() => handleDelete(entry)}
