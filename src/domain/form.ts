@@ -33,6 +33,33 @@ export function shiftDate(date: string, days: number): string {
   return toDateString(new Date(year!, month! - 1, day! + days))
 }
 
+/** 本地時間的 HH:mm，給時間欄位的「現在」按鈕用 */
+export function toTimeString(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
+/** 飲水量欄位加上 ml；欄位空白當作 0 */
+export function addWater(current: string, ml: number): string {
+  return String((Number(current) || 0) + ml)
+}
+
+/** 把另一天的餐點補進還空著的餐別，已有內容的不動。回傳新的餐點與補了幾個餐別 */
+export function fillEmptyMeals(
+  current: FormValues['meals'],
+  source: FormValues['meals'],
+): { meals: FormValues['meals']; filled: number } {
+  const meals = { ...current }
+  let filled = 0
+  for (const type of MEAL_TYPES) {
+    if (meals[type].trim() === '' && source[type].trim() !== '') {
+      meals[type] = source[type]
+      filled++
+    }
+  }
+  return { meals, filled }
+}
+
 export function emptyForm(date: string): FormValues {
   return {
     date,

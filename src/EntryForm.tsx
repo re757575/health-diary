@@ -10,7 +10,7 @@ import {
   TextInput,
 } from '@mantine/core'
 import { useState, type FormEvent } from 'react'
-import { saveEntry } from '@/data/repository'
+import { getEntry, saveEntry } from '@/data/repository'
 import {
   BRISTOL_DESCRIPTIONS,
   LONG_SLEEP_HOURS,
@@ -22,9 +22,19 @@ import {
   sleepHours,
   type MealType,
 } from '@/domain/entry'
-import { formToEntry, shiftDate, type BowelFormValues, type FormValues } from '@/domain/form'
+import {
+  addWater,
+  emptyForm,
+  entryToForm,
+  fillEmptyMeals,
+  formToEntry,
+  shiftDate,
+  type BowelFormValues,
+  type FormValues,
+} from '@/domain/form'
 import { RatingPicker } from './RatingPicker'
 import { Status } from './Status'
+import { TimeField } from './TimeField'
 import { useStatus } from './useStatus'
 
 interface Props {
@@ -39,6 +49,8 @@ const MEAL_PLACEHOLDERS: Record<MealType, string> = {
   dinner: '例如：燙青菜、豆腐、白飯半碗',
   snack: '例如：無糖豆漿、堅果',
 }
+
+const emptyMeals = emptyForm('').meals
 
 const EMPTY_BOWEL: BowelFormValues = { time: '', bristol: '', note: '' }
 
@@ -64,6 +76,22 @@ export function EntryForm({ initial, onDateChange }: Props) {
       'bowel',
       form.bowel.map((b, i) => (i === index ? { ...b, ...patch } : b)),
     )
+
+  // 只補還空著的餐別，不蓋掉已經打的字；其他欄位（體重、睡眠、排便、飲水…）每天不同，不帶入
+  async function handleCopyMeals() {
+    const previousDate = shiftDate(form.date, -1)
+    const previous = await getEntry(previousDate)
+    const source = previous && entryToForm(previous).meals
+    const { meals, filled } = fillEmptyMeals(form.meals, source ?? emptyMeals)
+    if (!source || Object.values(source).every((text) => text.trim() === '')) {
+      setStatus(`${previousDate} 沒有餐點紀錄`)
+    } else if (filled === 0) {
+      setStatus('餐點欄位都已有內容，沒有帶入')
+    } else {
+      set('meals', meals)
+      setStatus(`已帶入 ${previousDate} 的 ${filled} 個餐別，記得檢查後儲存`)
+    }
+  }
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
@@ -137,8 +165,19 @@ export function EntryForm({ initial, onDateChange }: Props) {
             inputMode="numeric"
             step="50"
             min="0"
-            rightSection="ml"
-            rightSectionWidth="3rem"
+            rightSection={
+              <Button
+                type="button"
+                variant="light"
+                size="compact-xs"
+                aria-label="飲水加 250 ml"
+                onClick={() => set('waterMl', addWater(form.waterMl, 250))}
+              >
+                +250
+              </Button>
+            }
+            rightSectionWidth="3.75rem"
+            rightSectionPointerEvents="all"
             value={form.waterMl}
             onChange={(e) => set('waterMl', e.target.value)}
           />
@@ -151,17 +190,17 @@ export function EntryForm({ initial, onDateChange }: Props) {
           classNames={{ label: 'section-label' }}
         />
         <div className="fields">
-          <TextInput
+          <TimeField
             label="入睡時間"
-            type="time"
+            nowLabel="填入現在時刻：入睡"
             value={form.bedtime}
-            onChange={(e) => set('bedtime', e.target.value)}
+            onChange={(v) => set('bedtime', v)}
           />
-          <TextInput
+          <TimeField
             label="起床時間"
-            type="time"
+            nowLabel="填入現在時刻：起床"
             value={form.wakeTime}
-            onChange={(e) => set('wakeTime', e.target.value)}
+            onChange={(v) => set('wakeTime', v)}
           />
         </div>
         {hours !== undefined && (
@@ -186,6 +225,15 @@ export function EntryForm({ initial, onDateChange }: Props) {
           mt="xs"
           classNames={{ label: 'section-label' }}
         />
+        <Button
+          type="button"
+          variant="light"
+          size="compact-md"
+          style={{ alignSelf: 'flex-start' }}
+          onClick={handleCopyMeals}
+        >
+          複製前一天的餐點
+        </Button>
         {MEAL_TYPES.map((type) => (
           <Textarea
             key={type}
@@ -207,11 +255,11 @@ export function EntryForm({ initial, onDateChange }: Props) {
           <Paper withBorder p="sm" key={i} bg="var(--mantine-color-default-hover)">
             <Stack gap="sm">
               <div className="fields">
-                <TextInput
+                <TimeField
                   label="時間"
-                  type="time"
+                  nowLabel={`填入現在時刻：第 ${i + 1} 次排便`}
                   value={b.time}
-                  onChange={(e) => setBowel(i, { time: e.target.value })}
+                  onChange={(v) => setBowel(i, { time: v })}
                 />
               </div>
               <RatingPicker

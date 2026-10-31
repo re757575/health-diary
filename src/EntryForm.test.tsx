@@ -1,8 +1,8 @@
 import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { db } from '@/data/db'
-import { getEntry } from '@/data/repository'
+import { getEntry, saveEntry } from '@/data/repository'
 import { BRISTOL_DESCRIPTIONS, MOOD_DESCRIPTIONS, SLEEP_QUALITY_DESCRIPTIONS } from '@/domain/entry'
 import { emptyForm } from '@/domain/form'
 import { render } from '@/test/render'
@@ -223,5 +223,141 @@ describe('EntryForm：睡眠時數', () => {
     expect(screen.getByRole('button', { name: '儲存' })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: '儲存' }))
     expect(await getEntry(DATE)).toBeUndefined()
+  })
+})
+
+describe('EntryForm：快速輸入', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('飲水 +250 ml 從空白開始累加，也能接在手動輸入的數字後面', async () => {
+    const user = userEvent.setup()
+    renderForm()
+    const water = screen.getByLabelText('飲水（ml）')
+    const add = screen.getByRole('button', { name: '飲水加 250 ml' })
+
+    await user.click(add)
+    await user.click(add)
+    expect(water).toHaveValue(500)
+
+    await user.clear(water)
+    await user.type(water, '1000')
+    await user.click(add)
+    expect(water).toHaveValue(1250)
+
+    await user.click(screen.getByRole('button', { name: '儲存' }))
+    await screen.findByText(`已儲存 ${DATE} 的紀錄`)
+    expect((await getEntry(DATE))?.waterMl).toBe(1250)
+  })
+
+  it('「現在」按鈕把入睡、起床時間填成目前的本地時間', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date(2026, 9, 31, 7, 5))
+    const user = userEvent.setup()
+    renderForm()
+
+    await user.click(screen.getByRole('button', { name: '填入現在時刻：起床' }))
+    expect(screen.getByLabelText('起床時間')).toHaveValue('07:05')
+    expect(screen.getByLabelText('入睡時間')).toHaveValue('')
+
+    vi.setSystemTime(new Date(2026, 9, 31, 23, 40))
+    await user.click(screen.getByRole('button', { name: '填入現在時刻：入睡' }))
+    expect(screen.getByLabelText('入睡時間')).toHaveValue('23:40')
+  })
+
+  it('每一筆排便各自有「現在」按鈕，只改自己那一筆', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date(2026, 9, 31, 8, 15))
+    const user = userEvent.setup()
+    renderForm()
+    await user.click(screen.getByRole('button', { name: '新增排便' }))
+    await user.click(screen.getByRole('button', { name: '新增排便' }))
+
+    await user.click(screen.getByRole('button', { name: '填入現在時刻：第 2 次排便' }))
+
+    const times = screen.getAllByLabelText('時間')
+    expect(times[0]).toHaveValue('')
+    expect(times[1]).toHaveValue('08:15')
+  })
+
+  describe('複製前一天的餐點', () => {
+    const copy = () => screen.getByRole('button', { name: '複製前一天的餐點' })
+
+    it('把前一天的餐點帶進空著的餐別，不帶體重、飲水等每天不同的欄位', async () => {
+      await saveEntry({
+        date: '2026-10-28',
+        weightKg: 68,
+        waterMl: 2000,
+        meals: [
+          { type: 'breakfast', description: '豆漿 蛋餅' },
+          { type: 'dinner', description: '白飯 青菜' },
+        ],
+        bowel: [{ time: '08:15', bristol: 3 }],
+      })
+      const user = userEvent.setup()
+      renderForm()
+
+      await user.click(copy())
+
+      expect(screen.getByLabelText('早餐')).toHaveValue('豆漿 蛋餅')
+      expect(screen.getByLabelText('晚餐')).toHaveValue('白飯 青菜')
+      expect(screen.getByLabelText('午餐')).toHaveValue('')
+      expect(screen.getByLabelText('體重（kg）')).toHaveValue(null)
+      expect(screen.getByLabelText('飲水（ml）')).toHaveValue(null)
+      expect(screen.queryByLabelText('時間')).not.toBeInTheDocument()
+      expect(screen.getByRole('status')).toHaveTextContent('已帶入 2026-10-28 的 2 個餐別')
+      // 帶入只是填進表單，按儲存才會寫入
+      expect(await getEntry(DATE)).toBeUndefined()
+    })
+
+    it('已經打了字的餐別不會被蓋掉', async () => {
+      await saveEntry({
+        date: '2026-10-28',
+        meals: [
+          { type: 'breakfast', description: '昨天的早餐' },
+          { type: 'lunch', description: '昨天的午餐' },
+        ],
+        bowel: [],
+      })
+      const user = userEvent.setup()
+      renderForm()
+      await user.type(screen.getByLabelText('早餐'), '今天的早餐')
+
+      await user.click(copy())
+
+      expect(screen.getByLabelText('早餐')).toHaveValue('今天的早餐')
+      expect(screen.getByLabelText('午餐')).toHaveValue('昨天的午餐')
+      expect(screen.getByRole('status')).toHaveTextContent('已帶入 2026-10-28 的 1 個餐別')
+    })
+
+    it('所有餐別都已有內容時不帶入，並說明原因', async () => {
+      await saveEntry({
+        date: '2026-10-28',
+        meals: [{ type: 'breakfast', description: '昨天的早餐' }],
+        bowel: [],
+      })
+      const user = userEvent.setup()
+      renderForm()
+      await user.type(screen.getByLabelText('早餐'), '今天的早餐')
+
+      await user.click(copy())
+
+      expect(screen.getByLabelText('早餐')).toHaveValue('今天的早餐')
+      expect(screen.getByRole('status')).toHaveTextContent('餐點欄位都已有內容，沒有帶入')
+    })
+
+    it('前一天沒有紀錄，或只有體重沒有餐點時，說明沒有可帶入的餐點', async () => {
+      const user = userEvent.setup()
+      renderForm()
+
+      await user.click(copy())
+      expect(screen.getByRole('status')).toHaveTextContent('2026-10-28 沒有餐點紀錄')
+
+      await saveEntry({ date: '2026-10-28', weightKg: 68, meals: [], bowel: [] })
+      await user.click(copy())
+      expect(screen.getByRole('status')).toHaveTextContent('2026-10-28 沒有餐點紀錄')
+      expect(screen.getByLabelText('早餐')).toHaveValue('')
+    })
   })
 })

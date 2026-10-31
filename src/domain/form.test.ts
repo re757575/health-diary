@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import { entrySchema } from './entry'
-import { emptyForm, entryToForm, formToEntry, shiftDate, toDateString } from './form'
+import {
+  addWater,
+  emptyForm,
+  entryToForm,
+  fillEmptyMeals,
+  formToEntry,
+  shiftDate,
+  toDateString,
+  toTimeString,
+} from './form'
 
 describe('toDateString', () => {
   it('使用本地時區，個位數月日補零', () => {
@@ -17,6 +26,47 @@ describe('shiftDate', () => {
 
   it('移動 0 天維持原日期', () => {
     expect(shiftDate('2026-10-29', 0)).toBe('2026-10-29')
+  })
+})
+
+describe('toTimeString', () => {
+  it('使用本地時間，個位數補零', () => {
+    expect(toTimeString(new Date(2026, 9, 31, 7, 5))).toBe('07:05')
+    expect(toTimeString(new Date(2026, 9, 31, 23, 59))).toBe('23:59')
+  })
+})
+
+describe('addWater', () => {
+  it('在現有數值上累加，空白當作 0', () => {
+    expect(addWater('', 250)).toBe('250')
+    expect(addWater('500', 250)).toBe('750')
+  })
+})
+
+describe('fillEmptyMeals', () => {
+  const meals = (b: string, l = '', d = '', s = '') => ({
+    breakfast: b,
+    lunch: l,
+    dinner: d,
+    snack: s,
+  })
+
+  it('只補空著的餐別，已有內容的不動', () => {
+    const result = fillEmptyMeals(meals('我的早餐', ''), meals('昨天早餐', '昨天午餐'))
+    expect(result.meals).toEqual(meals('我的早餐', '昨天午餐'))
+    expect(result.filled).toBe(1)
+  })
+
+  it('只有空白的餐別視為空；來源只有空白的不帶入', () => {
+    const result = fillEmptyMeals(meals('  ', ''), meals('豆漿', '  '))
+    expect(result.meals).toEqual(meals('豆漿', ''))
+    expect(result.filled).toBe(1)
+  })
+
+  it('不修改傳入的物件', () => {
+    const current = meals('')
+    fillEmptyMeals(current, meals('豆漿'))
+    expect(current).toEqual(meals(''))
   })
 })
 

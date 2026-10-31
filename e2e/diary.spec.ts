@@ -162,7 +162,7 @@ test('分頁：切換不丟輸入；歷史紀錄按編輯回到今天並載入�
 
   // 前一天沒有紀錄：表單是空的，補填後存起來
   const today = await page.getByLabel('日期').inputValue()
-  await page.getByRole('button', { name: '前一天' }).click()
+  await page.getByRole('button', { name: '前一天', exact: true }).click()
   await expect(page.getByLabel('日期')).not.toHaveValue(today)
   await expect(page.getByLabel('體重（kg）')).toHaveValue('')
   await page.getByLabel('體重（kg）').fill('69')
@@ -171,7 +171,7 @@ test('分頁：切換不丟輸入；歷史紀錄按編輯回到今天並載入�
   const yesterday = await page.getByLabel('日期').inputValue()
 
   // 後一天載入的是今天的紀錄，不是前一天的
-  await page.getByRole('button', { name: '後一天' }).click()
+  await page.getByRole('button', { name: '後一天', exact: true }).click()
   await expect(page.getByLabel('日期')).toHaveValue(today)
   await expect(page.getByLabel('體重（kg）')).toHaveValue('70')
 
@@ -214,4 +214,47 @@ test('睡眠時數：即時顯示；超過 12 小時要確認，改正時間後�
   await expect(page.getByText(/是不是填錯了/)).toHaveCount(0)
   await page.getByRole('button', { name: '儲存', exact: true }).click()
   await expect(page.getByText(/已儲存 \d{4}-\d{2}-\d{2} 的紀錄/)).toBeVisible()
+})
+
+test('快速輸入：飲水 +250、時間「現在」按鈕、複製前一天的餐點', async ({ page }) => {
+  await page.goto('./')
+
+  // 飲水 +250 ml 累加
+  await page.getByRole('button', { name: '飲水加 250 ml' }).click()
+  await page.getByRole('button', { name: '飲水加 250 ml' }).click()
+  await expect(page.getByLabel('飲水（ml）')).toHaveValue('500')
+
+  // 「現在」按鈕填入目前時間（HH:mm）
+  await page.getByRole('button', { name: '新增排便' }).click()
+  await expect(page.getByLabel('時間', { exact: true })).toHaveValue('')
+  await page.getByRole('button', { name: '填入現在時刻：第 1 次排便' }).click()
+  await expect(page.getByLabel('時間', { exact: true })).toHaveValue(/^\d{2}:\d{2}$/)
+
+  await page.getByLabel('早餐').fill('豆漿 蛋餅')
+  await page.getByLabel('午餐').fill('雞腿便當')
+  await page.getByLabel('體重（kg）').fill('68')
+  await page.getByRole('button', { name: '儲存', exact: true }).click()
+  await expect(page.getByText(/已儲存 \d{4}-\d{2}-\d{2} 的紀錄/)).toBeVisible()
+  const saved = await page.getByLabel('日期').inputValue()
+
+  // 隔天的表單是空的；複製前一天只帶餐點，體重、飲水、排便不帶，也還沒儲存
+  await page.getByRole('button', { name: '後一天', exact: true }).click()
+  await expect(page.getByLabel('日期')).not.toHaveValue(saved)
+  await expect(page.getByLabel('早餐')).toHaveValue('')
+  await page.getByLabel('午餐').fill('自己打的午餐')
+  await page.getByRole('button', { name: '複製前一天的餐點' }).click()
+  await expect(page.getByRole('status')).toContainText(`已帶入 ${saved} 的 1 個餐別`)
+  await expect(page.getByLabel('早餐')).toHaveValue('豆漿 蛋餅')
+  await expect(page.getByLabel('午餐')).toHaveValue('自己打的午餐')
+  await expect(page.getByLabel('體重（kg）')).toHaveValue('')
+  await expect(page.getByLabel('飲水（ml）')).toHaveValue('')
+  await expect(page.getByRole('button', { name: /^填入現在時刻：第/ })).toHaveCount(0)
+
+  // 帶入後按儲存才寫入，重新整理後仍在
+  await page.getByRole('button', { name: '儲存', exact: true }).click()
+  await expect(page.getByText(/已儲存 \d{4}-\d{2}-\d{2} 的紀錄/)).toBeVisible()
+  await page.reload()
+  await page.getByRole('button', { name: '後一天', exact: true }).click()
+  await expect(page.getByLabel('早餐')).toHaveValue('豆漿 蛋餅')
+  await expect(page.getByLabel('午餐')).toHaveValue('自己打的午餐')
 })
