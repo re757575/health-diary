@@ -35,8 +35,13 @@ export function DataTools() {
   const lastBackup = useLiveQuery(async () => ({ at: await getLastBackupAt() }), [])
 
   async function handleExport() {
-    await exportBackup()
-    setStatus('已匯出備份檔')
+    const result = await exportBackup()
+    const messages = {
+      shared: '已匯出備份',
+      downloaded: '已匯出備份檔',
+      cancelled: '已取消匯出，這次沒有備份',
+    }
+    setStatus(messages[result])
   }
 
   async function handleImport(file: File | null) {
