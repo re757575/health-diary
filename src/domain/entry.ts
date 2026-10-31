@@ -89,6 +89,10 @@ export const entrySchema = z.object({
   waterMl: z.number().int().nonnegative().optional(),
   /** 自評心情／精神 1（很差）～ 5（很好） */
   mood: z.number().int().min(1).max(5).optional(),
+  /** 運動時間（分鐘，v3 新增） */
+  exerciseMinutes: z.number().int().nonnegative().optional(),
+  /** 當天的狀況標籤，例如「空氣品質差」「久坐」（v3 新增） */
+  tags: z.array(z.string().trim().min(1)).optional(),
   /** 選取的症狀與嚴重程度（v3 新增，舊紀錄沒有） */
   symptomItems: z.array(symptomItemSchema).optional(),
   /** 症狀的文字補充；v3 之前所有症狀都寫在這裡 */

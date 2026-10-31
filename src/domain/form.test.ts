@@ -106,6 +106,26 @@ describe('formToEntry', () => {
   })
 })
 
+describe('運動與狀況標籤', () => {
+  it('沒填運動、沒選標籤時，Entry 不帶這兩個欄位', () => {
+    const entry = formToEntry(emptyForm('2026-10-28'))
+    expect(entry.exerciseMinutes).toBeUndefined()
+    expect(entry.tags).toBeUndefined()
+  })
+
+  it('運動 0 分鐘是有效的紀錄（今天沒運動），不會被當成沒填', () => {
+    expect(formToEntry({ ...emptyForm('2026-10-28'), exerciseMinutes: '0' }).exerciseMinutes).toBe(
+      0,
+    )
+  })
+
+  it('舊紀錄沒有這兩個欄位，載入表單時是空字串與空陣列', () => {
+    const form = entryToForm({ date: '2026-10-28', meals: [], bowel: [] })
+    expect(form.exerciseMinutes).toBe('')
+    expect(form.tags).toEqual([])
+  })
+})
+
 describe('症狀項目', () => {
   it('沒有選任何症狀時，Entry 不帶 symptomItems', () => {
     expect(formToEntry(emptyForm('2026-10-28')).symptomItems).toBeUndefined()
@@ -126,6 +146,8 @@ describe('entryToForm', () => {
       bowel: [{ time: '08:10', bristol: 4, note: '順暢' }],
       waterMl: 1800,
       mood: 4,
+      exerciseMinutes: 120,
+      tags: ['空氣品質差', '久坐'],
       symptomItems: [
         { name: '頭痛', severity: 2 },
         { name: '耳鳴', severity: 1 },

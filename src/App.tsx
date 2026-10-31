@@ -5,6 +5,7 @@ import { getEntry, getProfile, listEntries } from '@/data/repository'
 import { emptyForm, entryToForm, toDateString } from '@/domain/form'
 import { sleepHours } from '@/domain/entry'
 import { collectSymptomNames } from '@/domain/symptom'
+import { collectTagNames } from '@/domain/tag'
 import { AboutSection } from './AboutSection'
 import { Conditions } from './Conditions'
 import { DataTools } from './DataTools'
@@ -24,6 +25,7 @@ export default function App() {
   const loaded = useLiveQuery(async () => ({ date, entry: await getEntry(date) }), [date])
   const history = useLiveQuery(listEntries, [])
   const symptomNames = useMemo(() => collectSymptomNames(history ?? []), [history])
+  const tagNames = useMemo(() => collectTagNames(history ?? []), [history])
   // 同樣包一層物件區分「載入中」與「尚未填寫」
   const profile = useLiveQuery(async () => ({ value: await getProfile() }), [])
 
@@ -60,6 +62,7 @@ export default function App() {
                 initial={loaded.entry ? entryToForm(loaded.entry) : emptyForm(date)}
                 onDateChange={setDate}
                 knownSymptoms={symptomNames}
+                knownTags={tagNames}
               />
             )}
           </Section>

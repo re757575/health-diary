@@ -1,3 +1,4 @@
+import { collectNames } from './choice'
 import type { Entry, SymptomItem, SymptomSeverity } from './entry'
 
 /** 預設的常用症狀；順序固定，點選的位置才不會變 */
@@ -12,15 +13,12 @@ export const PRESET_SYMPTOMS = [
   '疲倦',
 ] as const
 
-/** 預設症狀之後，接上過去紀錄裡出現過的其他症狀（依名稱排序） */
+/** 預設症狀之後，接上過去紀錄裡出現過的其他症狀 */
 export function collectSymptomNames(entries: Entry[]): string[] {
-  const extras = new Set<string>()
-  for (const entry of entries) {
-    for (const { name } of entry.symptomItems ?? []) {
-      if (!(PRESET_SYMPTOMS as readonly string[]).includes(name)) extras.add(name)
-    }
-  }
-  return [...PRESET_SYMPTOMS, ...[...extras].sort((a, b) => a.localeCompare(b, 'zh-Hant'))]
+  return collectNames(
+    PRESET_SYMPTOMS,
+    entries.flatMap((e) => (e.symptomItems ?? []).map((i) => i.name)),
+  )
 }
 
 /** 點選症狀：沒選就加入（預設輕），已選就取消 */

@@ -48,9 +48,15 @@ describe('備份匯出入', () => {
     expect(result.ok && result.entries[0]?.symptomItems).toBeUndefined()
   })
 
-  it('匯出的是 v3，紀錄裡的症狀項目匯出後再匯入不會掉', () => {
+  it('匯出的是 v3，紀錄裡的症狀、運動、標籤匯出後再匯入不會掉', () => {
     const data = {
-      entries: [entry('2026-10-28', { symptomItems: [{ name: '頭痛', severity: 2 }] })],
+      entries: [
+        entry('2026-10-28', {
+          symptomItems: [{ name: '頭痛', severity: 2 }],
+          exerciseMinutes: 120,
+          tags: ['空氣品質差'],
+        }),
+      ],
       conditions: [],
     }
     const text = serializeBackup(data)

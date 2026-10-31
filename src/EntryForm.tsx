@@ -34,9 +34,11 @@ import {
 } from '@/domain/form'
 import { RatingPicker } from './RatingPicker'
 import { SymptomPicker } from './SymptomPicker'
+import { TagPicker } from './TagPicker'
 import { Status } from './Status'
 import { TimeField } from './TimeField'
 import { PRESET_SYMPTOMS } from '@/domain/symptom'
+import { PRESET_TAGS } from '@/domain/tag'
 import { useStatus } from './useStatus'
 
 interface Props {
@@ -45,6 +47,8 @@ interface Props {
   onDateChange: (date: string) => void
   /** 症狀選擇器的候選清單（預設症狀加上過去用過的）；沒給就只有預設症狀 */
   knownSymptoms?: readonly string[]
+  /** 狀況標籤的候選清單；沒給就只有預設標籤 */
+  knownTags?: readonly string[]
 }
 
 const MEAL_PLACEHOLDERS: Record<MealType, string> = {
@@ -58,7 +62,12 @@ const emptyMeals = emptyForm('').meals
 
 const EMPTY_BOWEL: BowelFormValues = { time: '', bristol: '', note: '' }
 
-export function EntryForm({ initial, onDateChange, knownSymptoms = PRESET_SYMPTOMS }: Props) {
+export function EntryForm({
+  initial,
+  onDateChange,
+  knownSymptoms = PRESET_SYMPTOMS,
+  knownTags = PRESET_TAGS,
+}: Props) {
   const [form, setForm] = useState(initial)
   const [status, setStatus] = useStatus()
   // 使用者已經看過「睡太久」警告並按了確認的那組入睡／起床時間；時間一改就不算數
@@ -184,6 +193,16 @@ export function EntryForm({ initial, onDateChange, knownSymptoms = PRESET_SYMPTO
             rightSectionPointerEvents="all"
             value={form.waterMl}
             onChange={(e) => set('waterMl', e.target.value)}
+          />
+          <TextInput
+            label="運動（分鐘）"
+            type="number"
+            inputMode="numeric"
+            step="5"
+            min="0"
+            rightSection="分"
+            value={form.exerciseMinutes}
+            onChange={(e) => set('exerciseMinutes', e.target.value)}
           />
         </div>
 
@@ -320,6 +339,7 @@ export function EntryForm({ initial, onDateChange, knownSymptoms = PRESET_SYMPTO
           lowLabel="低落"
           highLabel="良好"
         />
+        <TagPicker known={knownTags} tags={form.tags} onChange={(tags) => set('tags', tags)} />
         <SymptomPicker
           known={knownSymptoms}
           items={form.symptomItems}

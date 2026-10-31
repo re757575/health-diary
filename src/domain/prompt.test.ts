@@ -65,6 +65,16 @@ describe('buildAnalysisPrompt', () => {
     expect(prompt).toContain('- 症狀：輕微腹脹')
   })
 
+  it('運動分鐘與當日狀況標籤', () => {
+    const prompt = buildAnalysisPrompt([
+      entry('2026-10-28', { exerciseMinutes: 120, tags: ['空氣品質差', '久坐'] }),
+      entry('2026-10-29', { exerciseMinutes: 0 }),
+    ])
+    expect(prompt).toContain('- 運動：120 分鐘')
+    expect(prompt).toContain('- 當日狀況：空氣品質差、久坐')
+    expect(prompt).toContain('- 運動：0 分鐘')
+  })
+
   it('症狀：點選的項目附上輕／中／重，文字補充接在後面', () => {
     const prompt = buildAnalysisPrompt([
       entry('2026-10-28', {

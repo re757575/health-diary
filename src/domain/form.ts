@@ -16,6 +16,8 @@ export interface FormValues {
   meals: Record<MealType, string>
   bowel: BowelFormValues[]
   waterMl: string
+  exerciseMinutes: string
+  tags: string[]
   mood: string
   symptomItems: SymptomItem[]
   symptoms: string
@@ -71,6 +73,8 @@ export function emptyForm(date: string): FormValues {
     meals: { breakfast: '', lunch: '', dinner: '', snack: '' },
     bowel: [],
     waterMl: '',
+    exerciseMinutes: '',
+    tags: [],
     mood: '',
     symptomItems: [],
     symptoms: '',
@@ -105,6 +109,8 @@ export function formToEntry(form: FormValues): Entry {
       .map((b) => ({ time: toText(b.time), bristol: toNumber(b.bristol), note: toText(b.note) }))
       .filter((b) => b.time !== undefined || b.bristol !== undefined || b.note !== undefined),
     waterMl: toNumber(form.waterMl),
+    exerciseMinutes: toNumber(form.exerciseMinutes),
+    tags: form.tags.length > 0 ? form.tags : undefined,
     mood: toNumber(form.mood),
     symptomItems: form.symptomItems.length > 0 ? form.symptomItems : undefined,
     symptoms: toText(form.symptoms),
@@ -129,6 +135,8 @@ export function entryToForm(entry: Entry): FormValues {
       note: b.note ?? '',
     })),
     waterMl: str(entry.waterMl),
+    exerciseMinutes: str(entry.exerciseMinutes),
+    tags: entry.tags ?? [],
     mood: str(entry.mood),
     symptomItems: entry.symptomItems ?? [],
     symptoms: entry.symptoms ?? '',

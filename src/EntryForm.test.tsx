@@ -427,7 +427,7 @@ describe('EntryForm：症狀', () => {
     expect(await getEntry(DATE)).toBeUndefined()
 
     await user.type(input, '手麻')
-    await user.click(screen.getByRole('button', { name: '新增' }))
+    await user.click(screen.getByRole('button', { name: '新增症狀' }))
     expect(screen.getByRole('button', { name: '手麻' })).toHaveAttribute('aria-pressed', 'true')
 
     // 重複輸入已選的症狀不會多一筆；空白不會新增
@@ -475,5 +475,79 @@ describe('EntryForm：症狀', () => {
     expect(symptomButton('頭痛')).toHaveAttribute('aria-pressed', 'true')
     expect(severity('頭痛', '重')).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByLabelText('症狀補充')).toHaveValue('喉嚨有點痛')
+  })
+})
+
+describe('EntryForm：運動與今天的狀況', () => {
+  const tagButton = (name: string) =>
+    within(screen.getByRole('group', { name: '今天的狀況' })).getByRole('button', { name })
+
+  it('運動分鐘存起來；填 0 也是有效紀錄', async () => {
+    const user = userEvent.setup()
+    renderForm()
+
+    await user.type(screen.getByLabelText('運動（分鐘）'), '120')
+    await user.click(screen.getByRole('button', { name: '儲存' }))
+    await screen.findByText(`已儲存 ${DATE} 的紀錄`)
+    expect((await getEntry(DATE))?.exerciseMinutes).toBe(120)
+  })
+
+  it('預設的狀況標籤一開始都沒選，點選與取消', async () => {
+    const user = userEvent.setup()
+    renderForm()
+    const group = within(screen.getByRole('group', { name: '今天的狀況' }))
+    for (const button of group.getAllByRole('button')) {
+      expect(button).toHaveAttribute('aria-pressed', 'false')
+    }
+    expect(group.getAllByRole('button').map((b) => b.textContent)).toEqual(
+      expect.arrayContaining(['空氣品質差', '久坐', '沒午休']),
+    )
+
+    await user.click(tagButton('久坐'))
+    expect(tagButton('久坐')).toHaveAttribute('aria-pressed', 'true')
+    await user.click(tagButton('久坐'))
+    expect(tagButton('久坐')).toHaveAttribute('aria-pressed', 'false')
+  })
+
+  it('選到的標籤與自己輸入的標籤一起存起來；Enter 不會送出表單', async () => {
+    const user = userEvent.setup()
+    renderForm()
+
+    await user.click(tagButton('空氣品質差'))
+    await user.click(tagButton('沒午休'))
+    await user.type(screen.getByLabelText('新增其他狀況'), '出差{Enter}')
+    expect(tagButton('出差')).toHaveAttribute('aria-pressed', 'true')
+    expect(await getEntry(DATE)).toBeUndefined()
+
+    await user.click(screen.getByRole('button', { name: '儲存' }))
+    await screen.findByText(`已儲存 ${DATE} 的紀錄`)
+    expect((await getEntry(DATE))?.tags).toEqual(['空氣品質差', '沒午休', '出差'])
+  })
+
+  it('標籤與症狀是兩組各自獨立的新增欄位，不會互相加到對方', async () => {
+    const user = userEvent.setup()
+    renderForm()
+
+    await user.type(screen.getByLabelText('新增其他狀況'), '出差')
+    await user.click(screen.getByRole('button', { name: '新增狀況' }))
+
+    expect(tagButton('出差')).toBeInTheDocument()
+    expect(
+      within(screen.getByRole('group', { name: '症狀' })).queryByRole('button', { name: '出差' }),
+    ).not.toBeInTheDocument()
+  })
+
+  it('候選清單用傳進來的 knownTags，已存的標籤載入後是選取狀態', () => {
+    render(
+      <EntryForm
+        initial={{ ...emptyForm(DATE), tags: ['出差'] }}
+        onDateChange={() => {}}
+        knownTags={['久坐', '出差']}
+      />,
+    )
+
+    const group = within(screen.getByRole('group', { name: '今天的狀況' }))
+    expect(group.getAllByRole('button').map((b) => b.textContent)).toEqual(['久坐', '出差'])
+    expect(tagButton('出差')).toHaveAttribute('aria-pressed', 'true')
   })
 })

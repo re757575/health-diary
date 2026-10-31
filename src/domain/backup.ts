@@ -5,7 +5,7 @@ import { profileSchema, type Profile } from './profile'
 
 export const BACKUP_APP = 'health-diary'
 /**
- * v1 只有 entries；v2 新增 conditions 與 profile；v3 的紀錄多了 symptomItems（症狀與嚴重程度）。
+ * v1 只有 entries；v2 新增 conditions 與 profile；v3 的紀錄多了 symptomItems（症狀與嚴重程度）、exerciseMinutes 與 tags。
  * 匯入時三個版本都接受：舊備份沒有的欄位都是選填
  */
 export const BACKUP_VERSION = 3

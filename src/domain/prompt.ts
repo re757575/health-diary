@@ -36,6 +36,8 @@ function formatEntry(entry: Entry): string {
   }
 
   if (entry.waterMl !== undefined) lines.push(`- 飲水：${entry.waterMl} ml`)
+  if (entry.exerciseMinutes !== undefined) lines.push(`- 運動：${entry.exerciseMinutes} 分鐘`)
+  if (entry.tags && entry.tags.length > 0) lines.push(`- 當日狀況：${entry.tags.join('、')}`)
 
   if (entry.bowel.length > 0) {
     const items = entry.bowel.map((b) =>

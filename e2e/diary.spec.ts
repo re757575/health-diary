@@ -319,3 +319,41 @@ test('症狀：點選＋輕中重 → 自訂症狀 → 趨勢頁出現天數 →
     '症狀：頭痛（重）、鼻塞（輕）、耳鳴（輕）；下午開車時腰椎酸痛',
   )
 })
+
+test('運動與今天的狀況：填寫後重新整理仍在，自訂標籤隔天出現在清單，進 AI 提示詞', async ({
+  page,
+}) => {
+  await page.goto('./')
+
+  await page.getByLabel('運動（分鐘）').fill('120')
+  const tags = page.getByRole('group', { name: '今天的狀況' })
+  await tags.getByRole('button', { name: '空氣品質差' }).click()
+  await tags.getByRole('button', { name: '久坐' }).click()
+  await page.getByLabel('新增其他狀況').fill('出差')
+  await page.getByRole('button', { name: '新增狀況' }).click()
+  await expect(tags.getByRole('button', { name: '出差' })).toHaveAttribute('aria-pressed', 'true')
+  await page.getByRole('button', { name: '儲存', exact: true }).click()
+  await expect(page.getByText(/已儲存 \d{4}-\d{2}-\d{2} 的紀錄/)).toBeVisible()
+
+  await page.reload()
+  await expect(page.getByLabel('運動（分鐘）')).toHaveValue('120')
+  await expect(tags.getByRole('button', { name: '空氣品質差' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  )
+  await expect(tags.getByRole('button', { name: '沒午休' })).toHaveAttribute(
+    'aria-pressed',
+    'false',
+  )
+
+  // 隔天：自訂的「出差」在清單裡但沒選，運動是空的
+  await page.getByRole('button', { name: '後一天', exact: true }).click()
+  await expect(page.getByLabel('運動（分鐘）')).toHaveValue('')
+  await expect(tags.getByRole('button', { name: '出差' })).toHaveAttribute('aria-pressed', 'false')
+
+  await openTab(page, '設定')
+  await page.getByRole('button', { name: '產生 AI 提示詞' }).click()
+  const prompt = page.getByLabel('提示詞')
+  await expect(prompt).toContainText('- 運動：120 分鐘')
+  await expect(prompt).toContainText('- 當日狀況：空氣品質差、久坐、出差')
+})
