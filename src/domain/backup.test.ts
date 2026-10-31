@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { BACKUP_VERSION, parseBackup, serializeBackup } from './backup'
+import {
+  BACKUP_VERSION,
+  backupStatus,
+  describeLastBackup,
+  parseBackup,
+  serializeBackup,
+} from './backup'
 import type { Condition } from './condition'
 import type { Entry } from './entry'
 
@@ -129,5 +135,32 @@ describe('備份匯出入', () => {
       ...extra,
     })
     expect(parseBackup(text).ok).toBe(false)
+  })
+})
+
+describe('備份提醒', () => {
+  // 本地時間 2026-10-31 中午
+  const now = new Date(2026, 9, 31, 12)
+  const daysAgo = (days: number) => new Date(2026, 9, 31 - days, 21).toISOString()
+
+  it('沒有任何紀錄時不提醒', () => {
+    expect(backupStatus(undefined, undefined, now)).toEqual({ daysSince: undefined, due: false })
+    expect(backupStatus(daysAgo(30), undefined, now).due).toBe(false)
+  })
+
+  it('上次備份滿 7 天才提醒，以本地日期計算', () => {
+    expect(backupStatus(daysAgo(6), '2026-01-01', now)).toEqual({ daysSince: 6, due: false })
+    expect(backupStatus(daysAgo(7), '2026-01-01', now)).toEqual({ daysSince: 7, due: true })
+  })
+
+  it('沒備份過時從第一筆紀錄算起，剛開始記錄的前幾天不提醒', () => {
+    expect(backupStatus(undefined, '2026-10-25', now)).toEqual({ daysSince: undefined, due: false })
+    expect(backupStatus(undefined, '2026-10-24', now).due).toBe(true)
+  })
+
+  it('上次備份的說明', () => {
+    expect(describeLastBackup(undefined, now)).toBe('還沒有備份過')
+    expect(describeLastBackup(new Date(2026, 9, 31, 8).toISOString(), now)).toBe('上次備份：今天')
+    expect(describeLastBackup(daysAgo(11), now)).toBe('上次備份：2026-10-20（11 天前）')
   })
 })

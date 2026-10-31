@@ -61,3 +61,14 @@ export async function importBackup({ entries, conditions, profile }: BackupData)
     if (profile) await db.profile.put({ ...profile, id: PROFILE_ID })
   })
 }
+
+const LAST_BACKUP_KEY = 'lastBackupAt'
+
+/** 上次匯出備份的時間（ISO 字串）；沒備份過回傳 undefined */
+export async function getLastBackupAt(): Promise<string | undefined> {
+  return (await db.meta.get(LAST_BACKUP_KEY))?.value
+}
+
+export async function recordBackup(at: Date): Promise<void> {
+  await db.meta.put({ key: LAST_BACKUP_KEY, value: at.toISOString() })
+}

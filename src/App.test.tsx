@@ -12,7 +12,12 @@ const openTab = (user: UserEvent, name: '今天' | '趨勢' | '設定') =>
   user.click(screen.getByRole('tab', { name }))
 
 beforeEach(async () => {
-  await Promise.all([db.entries.clear(), db.conditions.clear(), db.profile.clear()])
+  await Promise.all([
+    db.entries.clear(),
+    db.conditions.clear(),
+    db.profile.clear(),
+    db.meta.clear(),
+  ])
 })
 
 describe('App', () => {
@@ -187,6 +192,46 @@ describe('漏填提示', () => {
 
     await screen.findByLabelText('體重（kg）')
     expect(screen.queryByRole('region', { name: '未填完的紀錄' })).not.toBeInTheDocument()
+  })
+})
+
+describe('備份提醒', () => {
+  const today = toDateString(new Date())
+
+  it('第一筆紀錄滿 7 天還沒備份過時提醒；在提醒上匯出後就消失，設定頁顯示今天備份過', async () => {
+    const user = userEvent.setup()
+    URL.createObjectURL = vi.fn(() => 'blob:backup')
+    URL.revokeObjectURL = vi.fn()
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    await db.entries.put({ date: shiftDate(today, -7), weightKg: 65, meals: [], bowel: [] })
+    render(<App />)
+
+    const notice = await screen.findByRole('region', { name: '備份提醒' })
+    expect(notice).toHaveTextContent('還沒有備份過紀錄')
+    await user.click(within(notice).getByRole('button', { name: '匯出備份' }))
+
+    expect(click).toHaveBeenCalled()
+    await waitFor(() =>
+      expect(screen.queryByRole('region', { name: '備份提醒' })).not.toBeInTheDocument(),
+    )
+    await openTab(user, '設定')
+    expect(await screen.findByText(/上次備份：今天/)).toBeInTheDocument()
+    click.mockRestore()
+  })
+
+  it('剛開始記錄、或最近 7 天內備份過時不提醒', async () => {
+    // 等漏填提示出現，代表紀錄已載入，這時沒有備份提醒才算數
+    await db.entries.put({ date: shiftDate(today, -6), meals: [], bowel: [] })
+    const { unmount } = render(<App />)
+    await screen.findByRole('region', { name: '未填完的紀錄' })
+    expect(screen.queryByRole('region', { name: '備份提醒' })).not.toBeInTheDocument()
+    unmount()
+
+    await db.entries.put({ date: shiftDate(today, -30), meals: [], bowel: [] })
+    await db.meta.put({ key: 'lastBackupAt', value: new Date().toISOString() })
+    render(<App />)
+    await screen.findByRole('region', { name: '未填完的紀錄' })
+    expect(screen.queryByRole('region', { name: '備份提醒' })).not.toBeInTheDocument()
   })
 })
 

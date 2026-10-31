@@ -1,9 +1,16 @@
-import { Button, FileButton, Group, NativeSelect, Stack, Textarea } from '@mantine/core'
+import { Button, FileButton, Group, NativeSelect, Stack, Text, Textarea } from '@mantine/core'
+import { useLiveQuery } from 'dexie-react-hooks'
 import { useRef, useState } from 'react'
-import { getProfile, importBackup, listConditions, listEntries } from '@/data/repository'
-import { parseBackup, serializeBackup } from '@/domain/backup'
+import {
+  getLastBackupAt,
+  getProfile,
+  importBackup,
+  listConditions,
+  listEntries,
+} from '@/data/repository'
+import { describeLastBackup, parseBackup } from '@/domain/backup'
 import { buildAnalysisPrompt, recentEntries } from '@/domain/prompt'
-import { toDateString } from '@/domain/form'
+import { exportBackup } from './exportBackup'
 import { Section } from './Section'
 import { Status } from './Status'
 import { useStatus } from './useStatus'
@@ -15,29 +22,16 @@ const RANGES = [
   { label: '全部', days: Infinity },
 ]
 
-function download(filename: string, text: string) {
-  const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }))
-  const a = document.createElement('a')
-  a.href = url
-  a.download = filename
-  a.click()
-  URL.revokeObjectURL(url)
-}
-
 export function DataTools() {
   const [days, setDays] = useState(7)
   const [prompt, setPrompt] = useState('')
   const [status, setStatus] = useStatus()
   const resetFileRef = useRef<() => void>(null)
+  // 包一層物件區分「載入中」與「沒備份過」
+  const lastBackup = useLiveQuery(async () => ({ at: await getLastBackupAt() }), [])
 
   async function handleExport() {
-    const now = new Date()
-    const data = {
-      entries: await listEntries(),
-      conditions: await listConditions(),
-      profile: await getProfile(),
-    }
-    download(`health-diary-${toDateString(now)}.json`, serializeBackup(data, now))
+    await exportBackup()
     setStatus('已匯出備份檔')
   }
 
@@ -93,6 +87,11 @@ export function DataTools() {
         </Group>
         {prompt && <Textarea label="提示詞" readOnly rows={8} value={prompt} />}
 
+        {lastBackup && (
+          <Text size="sm" c="dimmed">
+            {describeLastBackup(lastBackup.at, new Date())}。資料只存在這台裝置，建議定期匯出備份
+          </Text>
+        )}
         <Group>
           <Button type="button" variant="light" onClick={handleExport}>
             匯出備份

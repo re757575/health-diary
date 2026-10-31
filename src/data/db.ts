@@ -8,10 +8,17 @@ export const PROFILE_ID = 'me'
 
 export type StoredProfile = Profile & { id: typeof PROFILE_ID }
 
+/** App 自己的狀態（例如上次備份的時間），不是健康資料，不放進備份檔 */
+export interface Meta {
+  key: string
+  value: string
+}
+
 class HealthDiaryDb extends Dexie {
   entries!: EntityTable<Entry, 'date'>
   conditions!: EntityTable<Condition, 'id'>
   profile!: EntityTable<StoredProfile, 'id'>
+  meta!: EntityTable<Meta, 'key'>
 
   constructor() {
     super('health-diary')
@@ -22,6 +29,8 @@ class HealthDiaryDb extends Dexie {
     // v3：紀錄新增選填的 symptomItems、exerciseMinutes、tags。沒有新資料表或索引，舊資料不需要轉換；
     // 資料表定義與 v2 相同，升版是為了標記這次的結構變更
     this.version(3).stores({ entries: 'date', conditions: 'id', profile: 'id' })
+    // v4：新增 meta 資料表，記錄上次匯出備份的時間。只新增資料表，既有資料不受影響
+    this.version(4).stores({ entries: 'date', conditions: 'id', profile: 'id', meta: 'key' })
   }
 }
 

@@ -1,7 +1,9 @@
 import { z } from 'zod'
 import { conditionSchema, type Condition } from './condition'
 import { entrySchema, type Entry } from './entry'
+import { toDateString } from './form'
 import { profileSchema, type Profile } from './profile'
+import { daysBetween } from './trend'
 
 export const BACKUP_APP = 'health-diary'
 /**
@@ -62,4 +64,40 @@ export function parseBackup(text: string): ParseBackupResult {
   }
   const { entries, conditions, profile } = result.data
   return { ok: true, entries, conditions, profile }
+}
+
+/** 距離上次備份（沒備份過就從第一筆紀錄算起）幾天以上就提醒備份 */
+export const BACKUP_REMINDER_DAYS = 7
+
+export interface BackupStatus {
+  /** 上次備份是幾天前（以本地日期計，當天為 0）；沒備份過為 undefined */
+  daysSince?: number
+  /** 該提醒備份了：有紀錄，且上次備份（或第一筆紀錄）已超過 BACKUP_REMINDER_DAYS 天 */
+  due: boolean
+}
+
+/**
+ * @param lastBackupAt 上次匯出備份的時間（ISO 字串）
+ * @param firstEntryDate 最早一筆紀錄的日期；沒有任何紀錄時不提醒
+ */
+export function backupStatus(
+  lastBackupAt: string | undefined,
+  firstEntryDate: string | undefined,
+  now: Date,
+): BackupStatus {
+  const today = toDateString(now)
+  const daysSince = lastBackupAt
+    ? daysBetween(toDateString(new Date(lastBackupAt)), today)
+    : undefined
+  if (firstEntryDate === undefined) return { daysSince, due: false }
+  const elapsed = daysSince ?? daysBetween(firstEntryDate, today)
+  return { daysSince, due: elapsed >= BACKUP_REMINDER_DAYS }
+}
+
+/** 顯示在備份區塊的「上次備份」說明 */
+export function describeLastBackup(lastBackupAt: string | undefined, now: Date): string {
+  const { daysSince } = backupStatus(lastBackupAt, undefined, now)
+  if (lastBackupAt === undefined || daysSince === undefined) return '還沒有備份過'
+  if (daysSince === 0) return '上次備份：今天'
+  return `上次備份：${toDateString(new Date(lastBackupAt))}（${daysSince} 天前）`
 }

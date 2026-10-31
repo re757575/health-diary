@@ -7,10 +7,12 @@ import {
   deleteCondition,
   deleteEntry,
   getEntry,
+  getLastBackupAt,
   getProfile,
   importBackup,
   listConditions,
   listEntries,
+  recordBackup,
   saveCondition,
   saveEntry,
   saveProfile,
@@ -31,7 +33,12 @@ const condition = (id: string, name: string, extra: Partial<Condition> = {}): Co
 })
 
 beforeEach(async () => {
-  await Promise.all([db.entries.clear(), db.conditions.clear(), db.profile.clear()])
+  await Promise.all([
+    db.entries.clear(),
+    db.conditions.clear(),
+    db.profile.clear(),
+    db.meta.clear(),
+  ])
 })
 
 describe('紀錄', () => {
@@ -130,9 +137,9 @@ describe('症狀項目與資料庫升版', () => {
     expect((await getEntry('2026-10-28'))?.symptomItems).toEqual(symptomItems)
   })
 
-  it('資料庫版本是 3', () => {
+  it('資料庫版本是 4（v4 新增 meta 資料表）', () => {
     // Dexie 內部版本是宣告的 10 倍；verno 回傳宣告的版本
-    expect(db.verno).toBe(3)
+    expect(db.verno).toBe(4)
   })
 
   it('v2 時代存的舊資料升版後仍在，沒有症狀項目', async () => {
@@ -159,5 +166,14 @@ describe('症狀項目與資料庫升版', () => {
       symptoms: '頭有點痛',
     })
     expect(await listConditions()).toHaveLength(1)
+  })
+})
+
+describe('上次備份時間', () => {
+  it('沒備份過是 undefined，記錄後讀得到，再備份會覆蓋', async () => {
+    expect(await getLastBackupAt()).toBeUndefined()
+    await recordBackup(new Date('2026-10-20T10:00:00Z'))
+    await recordBackup(new Date('2026-10-31T10:00:00Z'))
+    expect(await getLastBackupAt()).toBe('2026-10-31T10:00:00.000Z')
   })
 })

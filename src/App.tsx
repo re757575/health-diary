@@ -1,12 +1,14 @@
 import { Badge, Button, Container, Divider, Group, Stack, Tabs, Text, Title } from '@mantine/core'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Fragment, useEffect, useMemo, useState } from 'react'
-import { getEntry, getProfile, listEntries } from '@/data/repository'
+import { getEntry, getLastBackupAt, getProfile, listEntries } from '@/data/repository'
+import { backupStatus } from '@/domain/backup'
 import { emptyForm, entryToForm, toDateString } from '@/domain/form'
 import { sleepHours } from '@/domain/entry'
 import { collectSymptomNames } from '@/domain/symptom'
 import { collectTagNames } from '@/domain/tag'
 import { AboutSection } from './AboutSection'
+import { BackupNotice } from './BackupNotice'
 import { Conditions } from './Conditions'
 import { DataTools } from './DataTools'
 import { findIncompleteDays } from '@/domain/quality'
@@ -30,6 +32,7 @@ export default function App() {
   const tagNames = useMemo(() => collectTagNames(history ?? []), [history])
   // 同樣包一層物件區分「載入中」與「尚未填寫」
   const profile = useLiveQuery(async () => ({ value: await getProfile() }), [])
+  const lastBackup = useLiveQuery(async () => ({ at: await getLastBackupAt() }), [])
   // 每日紀錄表單是否有未儲存的修改
   const [dirty, setDirty] = useState(false)
 
@@ -59,6 +62,12 @@ export default function App() {
     window.scrollTo({ top: 0 })
   }
 
+  // history 由新到舊，最後一筆是第一天的紀錄
+  const backup =
+    history &&
+    lastBackup &&
+    backupStatus(lastBackup.at, history[history.length - 1]?.date, new Date())
+
   // 歷史紀錄在「趨勢」，編輯表單在「今天」，所以選一天來編輯時要切過去
   function editDate(next: string) {
     if (changeDate(next)) changeTab('today')
@@ -79,6 +88,7 @@ export default function App() {
 
         <Tabs.Panel value="today" pt="md">
           <Stack gap="md">
+            {backup?.due && <BackupNotice daysSince={backup.daysSince} />}
             {history && (
               <MissingNotice
                 days={findIncompleteDays(history, new Date())}
