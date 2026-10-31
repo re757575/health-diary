@@ -3,6 +3,7 @@ import { MEAL_LABELS, SEVERITY_LABELS, sleepHours, type Entry } from './entry'
 import { SEX_LABELS, ageOn, type Profile } from './profile'
 import { toDateString } from './form'
 import { findLongSleeps, missingFields } from './quality'
+import { weightOn } from './weight'
 
 const INSTRUCTIONS = `你是一位細心的健康數據分析助理。以下是我的每日飲食與健康紀錄，請協助分析：
 
@@ -14,10 +15,18 @@ const INSTRUCTIONS = `你是一位細心的健康數據分析助理。以下是�
 
 請用繁體中文回答。`
 
-function formatEntry(entry: Entry): string {
+/** @param history 全部紀錄，當天沒量體重時沿用之前最近一次的數值 */
+function formatEntry(entry: Entry, history: Entry[]): string {
   const lines: string[] = [`## ${entry.date}`]
 
-  if (entry.weightKg !== undefined) lines.push(`- 體重：${entry.weightKg} kg`)
+  if (entry.weightKg !== undefined) {
+    lines.push(`- 體重：${entry.weightKg} kg`)
+  } else {
+    const carried = weightOn(history, entry.date)
+    if (carried) {
+      lines.push(`- 體重：${carried.kg} kg（當天沒量，沿用 ${carried.measuredOn} 的數值）`)
+    }
+  }
 
   const hours = sleepHours(entry.sleep)
   if (entry.sleep && (hours !== undefined || entry.sleep.quality !== undefined)) {
@@ -79,7 +88,7 @@ function formatDates(dates: string[], max = 5): string {
  * 自動檢查出的資料問題：疑似填錯的睡眠時數，以及漏填的核心欄位。
  * 今天的紀錄可能還在填，不算漏填；沒有任何問題時回傳 undefined
  */
-function formatQuality(entries: Entry[], today: Date): string | undefined {
+function formatQuality(entries: Entry[], history: Entry[], today: Date): string | undefined {
   const lines: string[] = []
 
   for (const s of findLongSleeps(entries)) {
@@ -92,7 +101,7 @@ function formatQuality(entries: Entry[], today: Date): string | undefined {
   const missing = new Map<string, string[]>()
   for (const entry of entries) {
     if (entry.date === todayDate) continue
-    for (const label of missingFields(entry)) {
+    for (const label of missingFields(entry, history)) {
       missing.set(label, [...(missing.get(label) ?? []), entry.date])
     }
   }
@@ -133,6 +142,11 @@ export interface PromptOptions {
   profile?: Profile
   /** 計算年齡的基準日，預設為現在 */
   today?: Date
+  /**
+   * 全部紀錄（不只要分析的期間），當天沒量體重時從這裡找之前最近一次的數值；
+   * 預設只用要分析的紀錄，期間第一天之前量的體重就沿用不到
+   */
+  history?: Entry[]
 }
 
 /**
@@ -141,13 +155,13 @@ export interface PromptOptions {
  */
 export function buildAnalysisPrompt(
   entries: Entry[],
-  { conditions = [], profile, today = new Date() }: PromptOptions = {},
+  { conditions = [], profile, today = new Date(), history = entries }: PromptOptions = {},
 ): string {
   if (entries.length === 0) return ''
   const sorted = [...entries].sort((a, b) => a.date.localeCompare(b.date))
   const range = `${sorted[0].date} ～ ${sorted[sorted.length - 1].date}（共 ${sorted.length} 天有紀錄）`
   const profileSection = formatProfile(profile, today)
-  const qualitySection = formatQuality(sorted, today)
+  const qualitySection = formatQuality(sorted, history, today)
   return [
     INSTRUCTIONS,
     ...(profileSection ? [profileSection] : []),
@@ -155,6 +169,6 @@ export function buildAnalysisPrompt(
     `# 紀錄期間\n${range}`,
     ...(qualitySection ? [qualitySection] : []),
     '# 每日紀錄',
-    sorted.map(formatEntry).join('\n\n'),
+    sorted.map((entry) => formatEntry(entry, history)).join('\n\n'),
   ].join('\n\n')
 }

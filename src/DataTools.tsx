@@ -68,7 +68,8 @@ export function DataTools() {
   }
 
   async function handleGeneratePrompt() {
-    const entries = recentEntries(await listEntries(), days, new Date())
+    const history = await listEntries()
+    const entries = recentEntries(history, days, new Date())
     if (entries.length === 0) {
       setPrompt('')
       setStatus('這段期間沒有紀錄可以分析', true)
@@ -77,6 +78,7 @@ export function DataTools() {
     const text = buildAnalysisPrompt(entries, {
       conditions: await listConditions(),
       profile: await getProfile(),
+      history,
     })
     setPrompt(text)
     try {

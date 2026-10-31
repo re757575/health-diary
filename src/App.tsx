@@ -3,9 +3,10 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { useEffect, useMemo, useState } from 'react'
 import { getEntry, getLastBackupAt, getProfile, listEntries } from '@/data/repository'
 import { backupStatus } from '@/domain/backup'
-import { emptyForm, entryToForm, toDateString } from '@/domain/form'
+import { emptyForm, entryToForm, shiftDate, toDateString } from '@/domain/form'
 import { collectSymptomNames } from '@/domain/symptom'
 import { collectTagNames } from '@/domain/tag'
+import { weightOn } from '@/domain/weight'
 import { AboutSection } from './AboutSection'
 import { BackupNotice } from './BackupNotice'
 import { Conditions } from './Conditions'
@@ -30,6 +31,11 @@ export default function App() {
   const history = useLiveQuery(listEntries, [])
   const symptomNames = useMemo(() => collectSymptomNames(history ?? []), [history])
   const tagNames = useMemo(() => collectTagNames(history ?? []), [history])
+  // 體重沒填的日子沿用之前最近一次，表單上提示會沿用多少
+  const previousWeight = useMemo(
+    () => weightOn(history ?? [], shiftDate(date, -1)),
+    [history, date],
+  )
   // 同樣包一層物件區分「載入中」與「尚未填寫」
   const profile = useLiveQuery(async () => ({ value: await getProfile() }), [])
   const lastBackup = useLiveQuery(async () => ({ at: await getLastBackupAt() }), [])
@@ -121,6 +127,7 @@ export default function App() {
                   onDirtyChange={setDirty}
                   knownSymptoms={symptomNames}
                   knownTags={tagNames}
+                  previousWeight={previousWeight}
                 />
               )}
             </Section>

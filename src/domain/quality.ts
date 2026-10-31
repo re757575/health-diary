@@ -1,17 +1,27 @@
 import { LONG_SLEEP_HOURS, sleepHours, type Entry } from './entry'
 import { shiftDate, toDateString } from './form'
+import { weightOn } from './weight'
 
-/** 每天都該填的核心欄位；有沒有填決定這天「完整」與否（餐點、症狀等選填的不算） */
-const CORE_FIELDS: { label: string; filled: (entry: Entry) => boolean }[] = [
-  { label: '體重', filled: (e) => e.weightKg !== undefined },
+/**
+ * 每天都該填的核心欄位；有沒有填決定這天「完整」與否（餐點、症狀等選填的不算）。
+ * `history` 是全部紀錄：體重沒量時沿用之前最近一次，之前量過就不算沒填
+ */
+const CORE_FIELDS: { label: string; filled: (entry: Entry, history: Entry[]) => boolean }[] = [
+  {
+    label: '體重',
+    filled: (e, history) => e.weightKg !== undefined || weightOn(history, e.date) !== undefined,
+  },
   { label: '飲水', filled: (e) => e.waterMl !== undefined },
   { label: '睡眠時間', filled: (e) => Boolean(e.sleep?.bedtime && e.sleep.wakeTime) },
   { label: '心情', filled: (e) => e.mood !== undefined },
 ]
 
-/** 這筆紀錄還沒填的核心欄位名稱 */
-export function missingFields(entry: Entry): string[] {
-  return CORE_FIELDS.filter((f) => !f.filled(entry)).map((f) => f.label)
+/**
+ * 這筆紀錄還沒填的核心欄位名稱
+ * @param history 全部紀錄，用來判斷體重能不能沿用之前的數值；沒給就只看這一筆
+ */
+export function missingFields(entry: Entry, history: Entry[] = []): string[] {
+  return CORE_FIELDS.filter((f) => !f.filled(entry, history)).map((f) => f.label)
 }
 
 export interface LongSleep {
@@ -54,7 +64,8 @@ export function findIncompleteDays(entries: Entry[], today: Date, days = 7): Inc
     const date = shiftDate(todayDate, -i)
     if (date < firstDate) break
     const entry = byDate.get(date)
-    const missing = entry ? missingFields(entry) : CORE_FIELDS.map((f) => f.label)
+    // 整天沒紀錄的日子，體重一樣可以沿用之前的數值
+    const missing = missingFields(entry ?? { date, meals: [], bowel: [] }, entries)
     if (missing.length > 0) result.push({ date, empty: !entry, missing })
   }
   return result

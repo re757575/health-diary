@@ -87,7 +87,8 @@ describe('buildAnalysisPrompt', () => {
       expect(prompt).toContain(
         '- 疑似填錯：2026-10-28 睡眠 19.8 小時（11:50 入睡、07:40 起床），可能是上午／下午填反',
       )
-      expect(prompt).toContain('- 沒填：體重 2 天（2026-10-29、2026-10-30）')
+      // 10/29、10/30 沒量體重，沿用 10/28 的數值，不算沒填
+      expect(prompt).not.toContain('- 沒填：體重')
       expect(prompt).toContain('- 沒填：飲水 1 天（2026-10-30）')
       expect(prompt).not.toContain('- 沒填：心情')
       expect(prompt.indexOf('# 資料品質備註')).toBeLessThan(prompt.indexOf('# 每日紀錄'))
@@ -183,5 +184,26 @@ describe('buildAnalysisPrompt', () => {
     const unknown = buildAnalysisPrompt([entry('2026-10-28')])
     expect(unknown).toContain('- 排便：未記錄')
     expect(unknown).not.toContain('0 次')
+  })
+})
+
+describe('體重沿用之前的數值', () => {
+  it('當天沒量就沿用之前最近一次，並註明是沿用哪天的', () => {
+    const prompt = buildAnalysisPrompt([
+      entry('2026-10-28', { weightKg: 70 }),
+      entry('2026-10-29'),
+      entry('2026-10-30', { weightKg: 69.5 }),
+    ])
+    expect(prompt).toContain('## 2026-10-29\n- 體重：70 kg（當天沒量，沿用 2026-10-28 的數值）')
+    expect(prompt).toContain('## 2026-10-30\n- 體重：69.5 kg\n')
+  })
+
+  it('分析期間之前量的體重，透過 history 也沿用得到', () => {
+    const before = entry('2026-10-01', { weightKg: 71 })
+    const inRange = entry('2026-10-28')
+    expect(buildAnalysisPrompt([inRange])).not.toContain('- 體重：')
+    expect(buildAnalysisPrompt([inRange], { history: [before, inRange] })).toContain(
+      '- 體重：71 kg（當天沒量，沿用 2026-10-01 的數值）',
+    )
   })
 })

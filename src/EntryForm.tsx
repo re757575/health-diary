@@ -40,6 +40,7 @@ import { Status } from './Status'
 import { TimeField } from './TimeField'
 import { PRESET_SYMPTOMS } from '@/domain/symptom'
 import { PRESET_TAGS } from '@/domain/tag'
+import type { DayWeight } from '@/domain/weight'
 import { useStatus } from './useStatus'
 
 interface Props {
@@ -52,6 +53,8 @@ interface Props {
   knownSymptoms?: readonly string[]
   /** 狀況標籤的候選清單；沒給就只有預設標籤 */
   knownTags?: readonly string[]
+  /** 這天之前最近一次量的體重；體重沒填時沿用它，顯示在欄位提示 */
+  previousWeight?: DayWeight
 }
 
 const MEAL_PLACEHOLDERS: Record<MealType, string> = {
@@ -71,6 +74,7 @@ export function EntryForm({
   onDirtyChange,
   knownSymptoms = PRESET_SYMPTOMS,
   knownTags = PRESET_TAGS,
+  previousWeight,
 }: Props) {
   const [form, setForm] = useState(initial)
   // 這天的紀錄在別處被改掉（刪除、復原、匯入備份）時，上層會傳來新的 initial：
@@ -187,6 +191,7 @@ export function EntryForm({
             step="0.1"
             min="0"
             rightSection="kg"
+            placeholder={previousWeight && `沿用 ${previousWeight.kg}`}
             value={form.weightKg}
             onChange={(e) => set('weightKg', e.target.value)}
           />

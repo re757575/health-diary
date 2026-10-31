@@ -344,6 +344,44 @@ describe('過了午夜回到 App', () => {
   })
 })
 
+describe('體重沒填時沿用上一次', () => {
+  const today = toDateString(new Date())
+
+  it('體重欄位提示會沿用之前最近一次量的數值；之前沒量過就不提示', async () => {
+    const user = userEvent.setup()
+    await db.entries.bulkPut([
+      { date: shiftDate(today, -5), weightKg: 68.5, meals: [], bowel: [] },
+      { date: shiftDate(today, -3), meals: [], bowel: [] },
+    ])
+    render(<App />)
+
+    await waitFor(() =>
+      expect(screen.getByLabelText('體重（kg）')).toHaveAttribute('placeholder', '沿用 68.5'),
+    )
+    for (let i = 0; i < 5; i++) await user.click(screen.getByRole('button', { name: '前一天' }))
+    await waitFor(() => expect(screen.getByLabelText('日期')).toHaveValue(shiftDate(today, -5)))
+    expect(screen.getByLabelText('體重（kg）')).not.toHaveAttribute('placeholder')
+  })
+
+  it('AI 提示詞沿用分析期間之前量的體重', async () => {
+    const user = userEvent.setup()
+    vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue()
+    await db.entries.bulkPut([
+      { date: shiftDate(today, -40), weightKg: 71, meals: [], bowel: [] },
+      { date: shiftDate(today, -2), mood: 3, meals: [], bowel: [] },
+    ])
+    render(<App />)
+
+    await openTab(user, '設定')
+    await user.click(await screen.findByRole('button', { name: '產生 AI 提示詞' }))
+
+    const prompt = await screen.findByLabelText<HTMLTextAreaElement>('提示詞')
+    expect(prompt.value).toContain(
+      `- 體重：71 kg（當天沒量，沿用 ${shiftDate(today, -40)} 的數值）`,
+    )
+  })
+})
+
 describe('切換日期', () => {
   it('用前一天、後一天切換日期時，載入的是那一天的紀錄，不是上一天的', async () => {
     const user = userEvent.setup()

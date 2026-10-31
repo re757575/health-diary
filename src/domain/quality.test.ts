@@ -82,14 +82,21 @@ describe('findIncompleteDays', () => {
     ])
   })
 
-  it('中間整天沒記錄的日子標為 empty，缺全部欄位', () => {
+  it('中間整天沒記錄的日子標為 empty；體重沿用前一天量的，其餘欄位都缺', () => {
     const days = findIncompleteDays(
       [entry('2026-10-28', complete), entry('2026-10-30', complete)],
       today,
     )
     expect(days).toEqual([
-      { date: '2026-10-29', empty: true, missing: ['體重', '飲水', '睡眠時間', '心情'] },
+      { date: '2026-10-29', empty: true, missing: ['飲水', '睡眠時間', '心情'] },
     ])
+  })
+
+  it('體重從來沒量過的話，沒填體重仍算缺漏', () => {
+    const { weightKg: _, ...noWeight } = complete
+    const days = findIncompleteDays([entry('2026-10-29', noWeight)], today)
+    expect(days.find((d) => d.date === '2026-10-30')?.missing).toContain('體重')
+    expect(days.find((d) => d.date === '2026-10-29')?.missing).toEqual(['體重'])
   })
 
   it('今天還在填，不列入；第一筆紀錄之前的日子也不算漏填', () => {
@@ -107,5 +114,19 @@ describe('findIncompleteDays', () => {
       today,
     )
     expect(days).toEqual([])
+  })
+})
+
+describe('missingFields：體重沿用之前的數值', () => {
+  const rest = { waterMl: 1, mood: 1, sleep: { bedtime: '23:00', wakeTime: '07:00' } }
+
+  it('之前量過體重，這天沒填不算缺漏', () => {
+    const history = [entry('2026-10-20', { weightKg: 70 })]
+    expect(missingFields(entry('2026-10-28', rest), history)).toEqual([])
+  })
+
+  it('只有之後才量的體重不能往回沿用', () => {
+    const history = [entry('2026-10-29', { weightKg: 70 })]
+    expect(missingFields(entry('2026-10-28', rest), history)).toEqual(['體重'])
   })
 })
