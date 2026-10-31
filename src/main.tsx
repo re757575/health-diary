@@ -25,8 +25,12 @@ import '@mantine/core/styles/Title.css'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App'
+import { requestPersistentStorage } from '@/data/storage'
 import { Providers } from './Providers'
 import './index.css'
+
+// 資料只存在這台裝置，盡量避免被瀏覽器自動清除；結果不影響使用，不用等
+void requestPersistentStorage()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

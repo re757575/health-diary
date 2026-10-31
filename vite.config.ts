@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import react from '@vitejs/plugin-react'
+import { VitePWA } from 'vite-plugin-pwa'
 import { defineConfig } from 'vitest/config'
 
 // GitHub Pages 專案網站的路徑：https://<user>.github.io/health-diary/
@@ -14,7 +15,32 @@ const { version } = JSON.parse(
 export default defineConfig({
   define: { __APP_VERSION__: JSON.stringify(version) },
   base: BASE,
-  plugins: [react()],
+  plugins: [
+    react(),
+    // 可安裝到主畫面、離線也能開。新版的 service worker 裝好後直接接手，但不重新整理頁面
+    // （正在填的表單不會被洗掉），下次開啟才是新版
+    VitePWA({
+      registerType: 'autoUpdate',
+      injectRegister: 'script-defer',
+      // 圖示由 pwa-assets.config.ts 產生；theme-color 已寫在 index.html（分淺色／深色），不要再注入
+      pwaAssets: { config: true, injectThemeColor: false },
+      manifest: {
+        name: '健康日記',
+        short_name: '健康日記',
+        description: '每日記錄飲食與健康狀況，資料只存在這台裝置',
+        lang: 'zh-Hant-TW',
+        display: 'standalone',
+        theme_color: '#ffffff',
+        background_color: '#ffffff',
+      },
+      workbox: {
+        globPatterns: ['**/*.{js,css,html,svg,png}'],
+        // 第一次開啟就接手目前的頁面，不用重新整理一次才能離線使用
+        clientsClaim: true,
+        skipWaiting: true,
+      },
+    }),
+  ],
   build: {
     rolldownOptions: {
       output: {

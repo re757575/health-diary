@@ -493,3 +493,32 @@ test('趨勢：睡眠對心情與症狀的對照；睡眠填錯的日子不列�
   const data = figure.getByRole('table', { name: '睡眠、心情與症狀資料表' })
   await expect(data.getByRole('row', { name: new RegExp(dateOf(7)) })).toContainText('—3/5沒有症狀')
 })
+
+test('可安裝的 PWA：有 manifest 與圖示，service worker 接手後離線也能開啟並存檔', async ({
+  page,
+  context,
+}) => {
+  await page.goto('./')
+
+  const manifest = await page.request.get('manifest.webmanifest')
+  expect(manifest.ok()).toBe(true)
+  const { name, display, icons } = (await manifest.json()) as {
+    name: string
+    display: string
+    icons: { src: string; purpose?: string }[]
+  }
+  expect(name).toBe('健康日記')
+  expect(display).toBe('standalone')
+  expect(icons.some((i) => i.purpose === 'maskable')).toBe(true)
+  for (const icon of icons) expect((await page.request.get(icon.src)).ok()).toBe(true)
+
+  // 等 service worker 安裝完並控制這個頁面，之後的請求才會從快取回應
+  // （用字串是因為 e2e 的 tsconfig 沒有 DOM 型別）
+  await page.waitForFunction('navigator.serviceWorker.controller !== null')
+
+  await context.setOffline(true)
+  await page.reload()
+  await page.getByLabel('體重（kg）').fill('66')
+  await page.getByRole('button', { name: '儲存', exact: true }).click()
+  await expect(page.getByText(/已儲存 \d{4}-\d{2}-\d{2} 的紀錄/)).toBeVisible()
+})

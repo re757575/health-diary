@@ -4,7 +4,8 @@
 
 - 可填寫基本資料（生日、身高、性別）與已知疾病（狀態、開始年月、用藥等備註），會一併帶入 AI 提示詞
 - 體重與睡眠時數的最近 30 天趨勢圖（手寫 SVG、不需圖表套件；沒紀錄的日子留白，可展開資料表檢視）
-- 資料只存在這台裝置的瀏覽器（IndexedDB），不上傳任何伺服器
+- 資料只存在這台裝置的瀏覽器（IndexedDB），不上傳任何伺服器；啟動時會請瀏覽器把資料設為持久保存，避免被自動清除
+- 可安裝到手機主畫面（PWA），離線也能開啟與記錄。新版在背景下載好，下次開啟時生效，不會在填寫途中重新整理
 - 可匯出／匯入 JSON 備份（換裝置或備份用）
 - 一鍵產生給 AI 分析的提示詞，並複製到剪貼簿
 
@@ -69,5 +70,7 @@ src/
   domain/   純 TypeScript：資料結構（Zod）、表單轉換、備份匯出入、AI 提示詞（不可 import React／Dexie）
   data/     Dexie 資料庫與 repository
   App.tsx, EntryForm.tsx, DataTools.tsx   UI
+public/
+  favicon.svg   App 圖示的來源，build 時依 pwa-assets.config.ts 產生各尺寸 PNG（不用提交產物）
 e2e/        Playwright 測試
 ```
