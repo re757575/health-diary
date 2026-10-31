@@ -16,6 +16,10 @@ describe('sleepHours', () => {
     expect(sleepHours({ bedtime: '13:00', wakeTime: '14:30' })).toBe(1.5)
   })
 
+  it('入睡時間誤填成上午時會算出超過半天，由表單負責提示', () => {
+    expect(sleepHours({ bedtime: '11:50', wakeTime: '07:40' })).toBe(19.8)
+  })
+
   it('缺少任一時間回傳 undefined', () => {
     expect(sleepHours({ bedtime: '23:00' })).toBeUndefined()
     expect(sleepHours(undefined)).toBeUndefined()

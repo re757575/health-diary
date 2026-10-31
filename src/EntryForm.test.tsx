@@ -138,3 +138,90 @@ describe('EntryForm：評分按鈕', () => {
     expect(option('睡眠品質（1–5）', 3)).toHaveAccessibleDescription(SLEEP_QUALITY_DESCRIPTIONS[2])
   })
 })
+
+describe('EntryForm：睡眠時數', () => {
+  async function fillSleep(
+    user: ReturnType<typeof userEvent.setup>,
+    bedtime: string,
+    wakeTime: string,
+  ) {
+    await user.type(screen.getByLabelText('入睡時間'), bedtime)
+    await user.type(screen.getByLabelText('起床時間'), wakeTime)
+  }
+
+  it('填好入睡與起床時間就即時顯示睡眠時數，缺一個時不顯示', async () => {
+    const user = userEvent.setup()
+    renderForm()
+
+    await user.type(screen.getByLabelText('入睡時間'), '23:30')
+    expect(screen.queryByText(/^睡 .* 小時/)).not.toBeInTheDocument()
+
+    await user.type(screen.getByLabelText('起床時間'), '07:00')
+    expect(screen.getByText('睡 7.5 小時')).toBeInTheDocument()
+
+    await user.clear(screen.getByLabelText('起床時間'))
+    expect(screen.queryByText(/^睡 .* 小時/)).not.toBeInTheDocument()
+  })
+
+  it('12 小時以內不提示，儲存一次就成功', async () => {
+    const user = userEvent.setup()
+    renderForm()
+
+    await fillSleep(user, '22:00', '10:00')
+    expect(screen.getByText('睡 12 小時')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: '儲存' }))
+
+    await screen.findByText(`已儲存 ${DATE} 的紀錄`)
+    expect((await getEntry(DATE))?.sleep).toMatchObject({ bedtime: '22:00', wakeTime: '10:00' })
+  })
+
+  it('超過 12 小時會提示可能填錯，第一次儲存不寫入，確認後再按才存', async () => {
+    const user = userEvent.setup()
+    renderForm()
+
+    // 入睡 23:50 誤填成 11:50（上午），算出來 19.8 小時
+    await fillSleep(user, '11:50', '07:40')
+    expect(screen.getByText(/睡 19\.8 小時，時間是不是填錯了/)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: '儲存' }))
+    expect(screen.getByRole('status')).toHaveTextContent('睡眠 19.8 小時，請確認入睡與起床時間')
+    expect(await getEntry(DATE)).toBeUndefined()
+
+    await user.click(screen.getByRole('button', { name: '睡眠 19.8 小時無誤，儲存' }))
+    await screen.findByText(`已儲存 ${DATE} 的紀錄`)
+    expect((await getEntry(DATE))?.sleep).toMatchObject({ bedtime: '11:50', wakeTime: '07:40' })
+  })
+
+  it('警告後改正時間，就不需要再確認，一次儲存即可', async () => {
+    const user = userEvent.setup()
+    renderForm()
+
+    await fillSleep(user, '11:50', '07:40')
+    await user.click(screen.getByRole('button', { name: '儲存' }))
+    expect(await getEntry(DATE)).toBeUndefined()
+
+    await user.clear(screen.getByLabelText('入睡時間'))
+    await user.type(screen.getByLabelText('入睡時間'), '23:50')
+    expect(screen.getByText('睡 7.8 小時')).toBeInTheDocument()
+    expect(screen.queryByText(/是不是填錯了/)).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: '儲存' }))
+    await screen.findByText(`已儲存 ${DATE} 的紀錄`)
+    expect((await getEntry(DATE))?.sleep?.bedtime).toBe('23:50')
+  })
+
+  it('確認過之後又改了時間且仍超過 12 小時，要重新確認', async () => {
+    const user = userEvent.setup()
+    renderForm()
+
+    await fillSleep(user, '11:50', '07:40')
+    await user.click(screen.getByRole('button', { name: '儲存' }))
+    expect(screen.getByRole('button', { name: '睡眠 19.8 小時無誤，儲存' })).toBeInTheDocument()
+
+    await user.clear(screen.getByLabelText('起床時間'))
+    await user.type(screen.getByLabelText('起床時間'), '07:50')
+    expect(screen.getByRole('button', { name: '儲存' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: '儲存' }))
+    expect(await getEntry(DATE)).toBeUndefined()
+  })
+})

@@ -90,3 +90,6 @@ export function sleepHours(sleep: Entry['sleep']): number | undefined {
   const minutes = diff <= 0 ? diff + 24 * 60 : diff
   return Math.round((minutes / 60) * 10) / 10
 }
+
+/** 超過這個時數多半是 12 小時制的上午／下午選錯（例如入睡 23:50 填成 11:50），儲存前要請使用者確認 */
+export const LONG_SLEEP_HOURS = 12

@@ -5,6 +5,7 @@ import {
   Group,
   Paper,
   Stack,
+  Text,
   Textarea,
   TextInput,
 } from '@mantine/core'
@@ -12,11 +13,13 @@ import { useState, type FormEvent } from 'react'
 import { saveEntry } from '@/data/repository'
 import {
   BRISTOL_DESCRIPTIONS,
+  LONG_SLEEP_HOURS,
   MEAL_LABELS,
   MEAL_TYPES,
   MOOD_DESCRIPTIONS,
   SLEEP_QUALITY_DESCRIPTIONS,
   entrySchema,
+  sleepHours,
   type MealType,
 } from '@/domain/entry'
 import { formToEntry, shiftDate, type BowelFormValues, type FormValues } from '@/domain/form'
@@ -42,6 +45,16 @@ const EMPTY_BOWEL: BowelFormValues = { time: '', bristol: '', note: '' }
 export function EntryForm({ initial, onDateChange }: Props) {
   const [form, setForm] = useState(initial)
   const [status, setStatus] = useStatus()
+  // 使用者已經看過「睡太久」警告並按了確認的那組入睡／起床時間；時間一改就不算數
+  const [confirmedSleep, setConfirmedSleep] = useState<string | null>(null)
+
+  const hours = sleepHours({
+    bedtime: form.bedtime || undefined,
+    wakeTime: form.wakeTime || undefined,
+  })
+  const isLongSleep = hours !== undefined && hours > LONG_SLEEP_HOURS
+  const sleepKey = `${form.bedtime}|${form.wakeTime}`
+  const sleepConfirmed = confirmedSleep === sleepKey
 
   const set = <K extends keyof FormValues>(key: K, value: FormValues[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }))
@@ -57,6 +70,11 @@ export function EntryForm({ initial, onDateChange }: Props) {
     const parsed = entrySchema.safeParse(formToEntry(form))
     if (!parsed.success) {
       setStatus('有欄位格式不正確，請檢查後再儲存', true)
+      return
+    }
+    if (isLongSleep && !sleepConfirmed) {
+      setConfirmedSleep(sleepKey)
+      setStatus(`睡眠 ${hours} 小時，請確認入睡與起床時間；沒問題請再按一次儲存`, true)
       return
     }
     await saveEntry(parsed.data)
@@ -146,6 +164,13 @@ export function EntryForm({ initial, onDateChange }: Props) {
             onChange={(e) => set('wakeTime', e.target.value)}
           />
         </div>
+        {hours !== undefined && (
+          <Text size="sm" c={isLongSleep ? 'orange.8' : 'dimmed'} aria-live="polite">
+            {isLongSleep
+              ? `睡 ${hours} 小時，時間是不是填錯了？例如入睡 23:50 填成了 11:50`
+              : `睡 ${hours} 小時`}
+          </Text>
+        )}
         <RatingPicker
           label="睡眠品質（1–5）"
           descriptions={SLEEP_QUALITY_DESCRIPTIONS}
@@ -260,8 +285,12 @@ export function EntryForm({ initial, onDateChange }: Props) {
 
       {/* 固定在畫面底部：表單很長，儲存按鈕與結果訊息隨時看得到 */}
       <div className="save-bar">
-        <Button type="submit" fullWidth>
-          儲存
+        <Button
+          type="submit"
+          fullWidth
+          color={isLongSleep && sleepConfirmed ? 'orange' : undefined}
+        >
+          {isLongSleep && sleepConfirmed ? `睡眠 ${hours} 小時無誤，儲存` : '儲存'}
         </Button>
         <Status status={status} />
       </div>

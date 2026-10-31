@@ -182,3 +182,36 @@ test('分頁：切換不丟輸入；歷史紀錄按編輯回到今天並載入�
   await expect(page.getByLabel('日期')).toHaveValue(yesterday)
   await expect(page.getByLabel('體重（kg）')).toHaveValue('69')
 })
+
+test('睡眠時數：即時顯示；超過 12 小時要確認，改正時間後可直接儲存', async ({ page }) => {
+  await page.goto('./')
+
+  await page.getByLabel('入睡時間').fill('23:50')
+  await page.getByLabel('起床時間').fill('07:40')
+  await expect(page.getByText('睡 7.8 小時')).toBeVisible()
+
+  // 入睡時間誤填成上午 11:50
+  await page.getByLabel('入睡時間').fill('11:50')
+  await expect(page.getByText(/睡 19\.8 小時，時間是不是填錯了/)).toBeVisible()
+  await page.getByRole('button', { name: '儲存', exact: true }).click()
+  await expect(page.getByRole('status')).toContainText('請確認入睡與起床時間')
+
+  // 第一次沒有寫入：重新整理後欄位是空的
+  await page.reload()
+  await expect(page.getByLabel('入睡時間')).toHaveValue('')
+
+  // 時間確實是這樣（例如夜班）：確認後才儲存
+  await page.getByLabel('入睡時間').fill('11:50')
+  await page.getByLabel('起床時間').fill('07:40')
+  await page.getByRole('button', { name: '儲存', exact: true }).click()
+  await page.getByRole('button', { name: '睡眠 19.8 小時無誤，儲存' }).click()
+  await expect(page.getByText(/已儲存 \d{4}-\d{2}-\d{2} 的紀錄/)).toBeVisible()
+  await page.reload()
+  await expect(page.getByLabel('入睡時間')).toHaveValue('11:50')
+
+  // 改正後不再警告，一次儲存
+  await page.getByLabel('入睡時間').fill('23:50')
+  await expect(page.getByText(/是不是填錯了/)).toHaveCount(0)
+  await page.getByRole('button', { name: '儲存', exact: true }).click()
+  await expect(page.getByText(/已儲存 \d{4}-\d{2}-\d{2} 的紀錄/)).toBeVisible()
+})
