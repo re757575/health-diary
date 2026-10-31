@@ -41,4 +41,36 @@ describe('MissingNotice', () => {
     expect(screen.getByRole('button', { name: '補填 2026-10-28' })).toBeInTheDocument()
     expect(within(screen.getAllByRole('listitem')[0]!).getByText('編輯中')).toBeInTheDocument()
   })
+
+  describe('漏填很多天時', () => {
+    const many = ['30', '29', '28', '27', '26'].map((d) => ({
+      date: `2026-10-${d}`,
+      empty: false,
+      missing: ['體重'],
+    }))
+
+    it('預設只列最近 3 天，標題仍是總天數，可展開與收合', async () => {
+      const user = userEvent.setup()
+      render(<MissingNotice days={many} currentDate="2026-10-31" onFill={vi.fn()} />)
+
+      expect(screen.getByRole('region', { name: '未填完的紀錄' })).toHaveTextContent(
+        '最近有 5 天的紀錄沒填完',
+      )
+      expect(screen.getAllByRole('listitem')).toHaveLength(3)
+      expect(screen.queryByRole('button', { name: '補填 2026-10-27' })).not.toBeInTheDocument()
+
+      await user.click(screen.getByRole('button', { name: '還有 2 天' }))
+      expect(screen.getAllByRole('listitem')).toHaveLength(5)
+      expect(screen.getByRole('button', { name: '補填 2026-10-26' })).toBeInTheDocument()
+
+      await user.click(screen.getByRole('button', { name: '收合' }))
+      expect(screen.getAllByRole('listitem')).toHaveLength(3)
+    })
+
+    it('剛好 3 天以內沒有展開按鈕', () => {
+      render(<MissingNotice days={many.slice(0, 3)} currentDate="2026-10-31" onFill={vi.fn()} />)
+
+      expect(screen.queryByRole('button', { name: /還有/ })).not.toBeInTheDocument()
+    })
+  })
 })
