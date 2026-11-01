@@ -719,3 +719,50 @@ describe('EntryForm：儲存失敗', () => {
     put.mockRestore()
   })
 })
+
+describe('EntryForm：用藥', () => {
+  const vitC = { id: 'c', name: 'DHC 維他命C', startDate: '2026-10-01' }
+
+  it('固定用藥預設都有吃；點一下標成沒吃，存檔記下沒吃的 id', async () => {
+    const user = userEvent.setup()
+    render(<EntryForm initial={emptyForm(DATE)} onDateChange={() => {}} medications={[vitC]} />)
+
+    const group = screen.getByRole('group', { name: '固定吃的藥' })
+    const med = within(group).getByRole('button', { name: 'DHC 維他命C' })
+    expect(med).toHaveAttribute('aria-pressed', 'true')
+
+    await user.click(med)
+    expect(med).toHaveAttribute('aria-pressed', 'false')
+    expect(med).toHaveTextContent('（沒吃）')
+    await user.click(screen.getByRole('button', { name: '儲存' }))
+    await screen.findByText(`已儲存 ${DATE} 的紀錄`)
+    expect((await getEntry(DATE))?.missedMedications).toEqual(['c'])
+  })
+
+  it('都有吃時不記任何東西', async () => {
+    const user = userEvent.setup()
+    render(<EntryForm initial={emptyForm(DATE)} onDateChange={() => {}} medications={[vitC]} />)
+
+    await user.type(screen.getByLabelText('體重（kg）'), '70')
+    await user.click(screen.getByRole('button', { name: '儲存' }))
+    await screen.findByText(`已儲存 ${DATE} 的紀錄`)
+    expect((await getEntry(DATE))?.missedMedications).toBeUndefined()
+  })
+
+  it('沒有登記固定用藥時提示可以到設定登記；臨時用藥可以點選或自行輸入', async () => {
+    const user = userEvent.setup()
+    render(
+      <EntryForm initial={emptyForm(DATE)} onDateChange={() => {}} knownAsNeeded={['普拿疼']} />,
+    )
+
+    expect(screen.getByText('每天固定吃的藥或保健食品，可以到「設定」登記')).toBeInTheDocument()
+    const asNeeded = screen.getByRole('group', { name: '臨時用藥' })
+    await user.click(within(asNeeded).getByRole('button', { name: '普拿疼' }))
+    await user.type(screen.getByLabelText('新增其他臨時用藥'), '胃藥')
+    await user.click(screen.getByRole('button', { name: '新增臨時用藥' }))
+    await user.click(screen.getByRole('button', { name: '儲存' }))
+
+    await screen.findByText(`已儲存 ${DATE} 的紀錄`)
+    expect((await getEntry(DATE))?.asNeededMedications).toEqual(['普拿疼', '胃藥'])
+  })
+})

@@ -7,6 +7,7 @@ import {
   importBackup,
   listConditions,
   listEntries,
+  listMedications,
 } from '@/data/repository'
 import { describeLastBackup, parseBackup, previewImport, type BackupData } from '@/domain/backup'
 import { buildAnalysisPrompt, recentEntries } from '@/domain/prompt'
@@ -95,6 +96,7 @@ export function DataTools() {
     }
     const text = buildAnalysisPrompt(entries, {
       conditions: await listConditions(),
+      medications: await listMedications(),
       profile: await getProfile(),
       history,
     })

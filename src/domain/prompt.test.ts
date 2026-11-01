@@ -225,3 +225,34 @@ describe('資料品質備註：可能打錯的體重', () => {
     expect(prompt).not.toContain('體重 71.5 kg（')
   })
 })
+
+describe('用藥', () => {
+  const vitC = { id: 'c', name: 'DHC 持續型維他命C', dose: '1000mg', startDate: '2026-10-20' }
+  const fishOil = { id: 'f', name: '魚油', startDate: '2026-01-01', endDate: '2026-03-01' }
+
+  it('列出分析期間內固定服用的藥，期間外的不列', () => {
+    const prompt = buildAnalysisPrompt([entry('2026-10-28')], { medications: [vitC, fishOil] })
+    expect(prompt).toContain('# 固定服用的藥物與保健食品')
+    expect(prompt).toContain('- DHC 持續型維他命C（1000mg）：2026-10-20 起')
+    expect(prompt).not.toContain('魚油')
+    expect(prompt.indexOf('# 固定服用的藥物與保健食品')).toBeLessThan(prompt.indexOf('# 每日紀錄'))
+  })
+
+  it('每天寫出沒吃的固定用藥與臨時用藥；已刪除的藥查不到名稱就略過', () => {
+    const prompt = buildAnalysisPrompt(
+      [
+        entry('2026-10-28', {
+          missedMedications: ['c', 'deleted'],
+          asNeededMedications: ['普拿疼', '胃藥'],
+        }),
+      ],
+      { medications: [vitC] },
+    )
+    expect(prompt).toContain('- 固定用藥沒吃：DHC 持續型維他命C\n')
+    expect(prompt).toContain('- 臨時用藥：普拿疼、胃藥')
+  })
+
+  it('沒有固定用藥時不加這一段', () => {
+    expect(buildAnalysisPrompt([entry('2026-10-28')])).not.toContain('# 固定服用的藥物')
+  })
+})

@@ -161,25 +161,25 @@ test('分頁：切換不丟輸入；歷史紀錄按編輯回到今天並載入�
   await expect(page.getByText(/已儲存 \d{4}-\d{2}-\d{2} 的紀錄/)).toBeVisible()
 
   // 前一天沒有紀錄：表單是空的，補填後存起來
-  const today = await page.getByLabel('日期').inputValue()
+  const today = await page.getByLabel('日期', { exact: true }).inputValue()
   await page.getByRole('button', { name: '前一天', exact: true }).click()
-  await expect(page.getByLabel('日期')).not.toHaveValue(today)
+  await expect(page.getByLabel('日期', { exact: true })).not.toHaveValue(today)
   await expect(page.getByLabel('體重（kg）')).toHaveValue('')
   await page.getByLabel('體重（kg）').fill('69')
   await page.getByRole('button', { name: '儲存', exact: true }).click()
   await expect(page.getByText(/已儲存 \d{4}-\d{2}-\d{2} 的紀錄/)).toBeVisible()
-  const yesterday = await page.getByLabel('日期').inputValue()
+  const yesterday = await page.getByLabel('日期', { exact: true }).inputValue()
 
   // 後一天載入的是今天的紀錄，不是前一天的
   await page.getByRole('button', { name: '後一天', exact: true }).click()
-  await expect(page.getByLabel('日期')).toHaveValue(today)
+  await expect(page.getByLabel('日期', { exact: true })).toHaveValue(today)
   await expect(page.getByLabel('體重（kg）')).toHaveValue('70')
 
   // 到「趨勢」的歷史紀錄編輯前一天：切回「今天」並載入 69
   await openTab(page, '趨勢')
   await page.getByRole('button', { name: `編輯 ${yesterday}` }).click()
   await expect(page.getByRole('tab', { name: '今天' })).toHaveAttribute('aria-selected', 'true')
-  await expect(page.getByLabel('日期')).toHaveValue(yesterday)
+  await expect(page.getByLabel('日期', { exact: true })).toHaveValue(yesterday)
   await expect(page.getByLabel('體重（kg）')).toHaveValue('69')
 })
 
@@ -250,11 +250,11 @@ test('快速輸入：飲水 +250、時間「現在」按鈕、複製前一天的
   await page.getByLabel('體重（kg）').fill('68')
   await page.getByRole('button', { name: '儲存', exact: true }).click()
   await expect(page.getByText(/已儲存 \d{4}-\d{2}-\d{2} 的紀錄/)).toBeVisible()
-  const saved = await page.getByLabel('日期').inputValue()
+  const saved = await page.getByLabel('日期', { exact: true }).inputValue()
 
   // 隔天的表單是空的；複製前一天只帶餐點，體重、飲水、排便不帶，也還沒儲存
   await page.getByRole('button', { name: '後一天', exact: true }).click()
-  await expect(page.getByLabel('日期')).not.toHaveValue(saved)
+  await expect(page.getByLabel('日期', { exact: true })).not.toHaveValue(saved)
   await expect(page.getByLabel('早餐')).toHaveValue('')
   await page.getByLabel('午餐').fill('自己打的午餐')
   await page.getByRole('button', { name: '複製前一天的餐點' }).click()
@@ -388,7 +388,7 @@ test('AI 提示詞的資料品質備註：標出疑似填錯的睡眠與漏填�
   await page.getByLabel('體重（kg）').fill('68')
   await page.getByRole('button', { name: '儲存', exact: true }).click()
   await expect(page.getByText(/已儲存 \d{4}-\d{2}-\d{2} 的紀錄/)).toBeVisible()
-  const yesterday = await page.getByLabel('日期').inputValue()
+  const yesterday = await page.getByLabel('日期', { exact: true }).inputValue()
 
   await openTab(page, '設定')
   await page.getByRole('button', { name: '產生 AI 提示詞' }).click()
@@ -412,7 +412,7 @@ test('漏填提示：列出沒填完的日子，補填跳到那天，補完後�
   await page.getByLabel('體重（kg）').fill('68')
   await page.getByRole('button', { name: '儲存', exact: true }).click()
   await expect(page.getByText(/已儲存 \d{4}-\d{2}-\d{2} 的紀錄/)).toBeVisible()
-  const yesterday = await page.getByLabel('日期').inputValue()
+  const yesterday = await page.getByLabel('日期', { exact: true }).inputValue()
 
   // 正在編輯那一天：列出缺漏，但不給補填
   await expect(notice).toContainText('最近有 1 天的紀錄沒填完')
@@ -422,7 +422,7 @@ test('漏填提示：列出沒填完的日子，補填跳到那天，補完後�
   // 回到今天：可以按補填跳回前一天，體重還在
   await page.getByRole('button', { name: '後一天', exact: true }).click()
   await page.getByRole('button', { name: `補填 ${yesterday}` }).click()
-  await expect(page.getByLabel('日期')).toHaveValue(yesterday)
+  await expect(page.getByLabel('日期', { exact: true })).toHaveValue(yesterday)
   await expect(page.getByLabel('體重（kg）')).toHaveValue('68')
 
   // 補完所有核心欄位後存檔，提示消失
@@ -544,4 +544,40 @@ test('草稿：沒儲存就被關掉（重新整理），再開啟時還原；�
   await page.reload()
   await expect(page.getByRole('region', { name: '還原的草稿' })).toHaveCount(0)
   await expect(page.getByLabel('早餐')).toHaveValue('')
+})
+
+test('用藥：設定登記固定用藥 → 每日預設有吃、標沒吃、加臨時用藥 → 進 AI 提示詞', async ({
+  page,
+}) => {
+  await page.goto('./')
+  await openTab(page, '設定')
+  const meds = page.getByRole('region', { name: '藥物與保健食品' })
+  await meds.getByLabel('名稱').fill('DHC 持續型維他命C')
+  await meds.getByLabel('劑量／用法').fill('1000mg')
+  await meds.getByRole('button', { name: '新增藥物' }).click()
+  await expect(meds.getByText('已新增「DHC 持續型維他命C」')).toBeVisible()
+
+  await openTab(page, '今天')
+  const vitC = page
+    .getByRole('group', { name: '固定吃的藥' })
+    .getByRole('button', { name: 'DHC 持續型維他命C' })
+  await expect(vitC).toHaveAttribute('aria-pressed', 'true')
+  await vitC.click()
+  await expect(vitC).toHaveAttribute('aria-pressed', 'false')
+  await page.getByLabel('新增其他臨時用藥').fill('普拿疼')
+  await page.getByRole('button', { name: '新增臨時用藥' }).click()
+  await page.getByRole('button', { name: '儲存', exact: true }).click()
+  await expect(page.getByText(/已儲存 \d{4}-\d{2}-\d{2} 的紀錄/)).toBeVisible()
+
+  // 重新整理後仍在
+  await page.reload()
+  await expect(vitC).toHaveAttribute('aria-pressed', 'false')
+
+  await openTab(page, '設定')
+  await page.getByRole('button', { name: '產生 AI 提示詞' }).click()
+  const prompt = page.getByLabel('提示詞')
+  await expect(prompt).toContainText('# 固定服用的藥物與保健食品')
+  await expect(prompt).toContainText('- DHC 持續型維他命C（1000mg）：')
+  await expect(prompt).toContainText('- 固定用藥沒吃：DHC 持續型維他命C')
+  await expect(prompt).toContainText('- 臨時用藥：普拿疼')
 })

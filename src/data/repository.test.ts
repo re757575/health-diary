@@ -6,15 +6,18 @@ import { db } from './db'
 import {
   deleteCondition,
   deleteEntry,
+  deleteMedication,
   getEntry,
   getLastBackupAt,
   getProfile,
   importBackup,
   listConditions,
   listEntries,
+  listMedications,
   recordBackup,
   saveCondition,
   saveEntry,
+  saveMedication,
   saveProfile,
 } from './repository'
 
@@ -38,6 +41,7 @@ beforeEach(async () => {
     db.conditions.clear(),
     db.profile.clear(),
     db.meta.clear(),
+    db.medications.clear(),
   ])
 })
 
@@ -137,9 +141,9 @@ describe('症狀項目與資料庫升版', () => {
     expect((await getEntry('2026-10-28'))?.symptomItems).toEqual(symptomItems)
   })
 
-  it('資料庫版本是 5（v4 新增 meta 資料表，v5 紀錄新增 noBowel）', () => {
+  it('資料庫版本是 6（v6 新增固定用藥資料表與紀錄的用藥欄位）', () => {
     // Dexie 內部版本是宣告的 10 倍；verno 回傳宣告的版本
-    expect(db.verno).toBe(5)
+    expect(db.verno).toBe(6)
   })
 
   it('v2 時代存的舊資料升版後仍在，沒有症狀項目', async () => {
@@ -175,5 +179,31 @@ describe('上次備份時間', () => {
     await recordBackup(new Date('2026-10-20T10:00:00Z'))
     await recordBackup(new Date('2026-10-31T10:00:00Z'))
     expect(await getLastBackupAt()).toBe('2026-10-31T10:00:00.000Z')
+  })
+})
+
+describe('固定用藥', () => {
+  it('依開始日期排序列出；可以更新與刪除；匯入備份時一起寫入', async () => {
+    await saveMedication({ id: 'b', name: '魚油', startDate: '2026-10-25' })
+    await saveMedication({ id: 'a', name: '維他命C', startDate: '2026-10-20' })
+    expect((await listMedications()).map((m) => m.id)).toEqual(['a', 'b'])
+
+    await saveMedication({
+      id: 'a',
+      name: '維他命C',
+      startDate: '2026-10-20',
+      endDate: '2026-10-30',
+    })
+    await deleteMedication('b')
+    expect(await listMedications()).toEqual([
+      { id: 'a', name: '維他命C', startDate: '2026-10-20', endDate: '2026-10-30' },
+    ])
+
+    await importBackup({
+      entries: [],
+      conditions: [],
+      medications: [{ id: 'c', name: '鈣片', startDate: '2026-11-01' }],
+    })
+    expect((await listMedications()).map((m) => m.id)).toEqual(['a', 'c'])
   })
 })

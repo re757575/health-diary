@@ -1,6 +1,7 @@
 import Dexie, { type EntityTable } from 'dexie'
 import type { Condition } from '@/domain/condition'
 import type { Entry } from '@/domain/entry'
+import type { Medication } from '@/domain/medication'
 import type { Profile } from '@/domain/profile'
 
 /** 基本資料整個 App 只有一份，固定用這個 id 存 */
@@ -19,6 +20,7 @@ class HealthDiaryDb extends Dexie {
   conditions!: EntityTable<Condition, 'id'>
   profile!: EntityTable<StoredProfile, 'id'>
   meta!: EntityTable<Meta, 'key'>
+  medications!: EntityTable<Medication, 'id'>
 
   constructor() {
     super('health-diary')
@@ -33,6 +35,15 @@ class HealthDiaryDb extends Dexie {
     this.version(4).stores({ entries: 'date', conditions: 'id', profile: 'id', meta: 'key' })
     // v5：紀錄新增選填的 noBowel（確認當天沒有排便）。沒有新資料表或索引，舊資料不需要轉換
     this.version(5).stores({ entries: 'date', conditions: 'id', profile: 'id', meta: 'key' })
+    // v6：新增固定用藥（medications）資料表；紀錄新增選填的 missedMedications、asNeededMedications。
+    // 只新增資料表與選填欄位，舊資料不需要轉換
+    this.version(6).stores({
+      entries: 'date',
+      conditions: 'id',
+      profile: 'id',
+      meta: 'key',
+      medications: 'id',
+    })
   }
 }
 

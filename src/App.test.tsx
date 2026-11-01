@@ -25,6 +25,7 @@ beforeEach(async () => {
     db.conditions.clear(),
     db.profile.clear(),
     db.meta.clear(),
+    db.medications.clear(),
   ])
 })
 
@@ -148,12 +149,18 @@ describe('分頁', () => {
 
     expect(await screen.findByRole('region', { name: '每日紀錄' })).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: '今天' })).toHaveAttribute('aria-selected', 'true')
-    for (const name of ['歷史紀錄', '已知疾病', '基本資料', 'AI 分析與資料備份']) {
+    for (const name of [
+      '歷史紀錄',
+      '已知疾病',
+      '藥物與保健食品',
+      '基本資料',
+      'AI 分析與資料備份',
+    ]) {
       expect(screen.queryByRole('region', { name })).not.toBeInTheDocument()
     }
   })
 
-  it('各分頁放的區塊：趨勢有趨勢圖與歷史紀錄，設定有疾病、基本資料、備份與關於', async () => {
+  it('各分頁放的區塊：趨勢有趨勢圖與歷史紀錄，設定有疾病、用藥、基本資料、備份與關於', async () => {
     const user = userEvent.setup()
     render(<App />)
 
@@ -163,7 +170,7 @@ describe('分頁', () => {
     expect(screen.queryByRole('region', { name: '每日紀錄' })).not.toBeInTheDocument()
 
     await openTab(user, '設定')
-    for (const name of ['已知疾病', '基本資料', 'AI 分析與資料備份', '關於']) {
+    for (const name of ['已知疾病', '藥物與保健食品', '基本資料', 'AI 分析與資料備份', '關於']) {
       expect(await screen.findByRole('region', { name })).toBeInTheDocument()
     }
     expect(screen.queryByRole('region', { name: '歷史紀錄' })).not.toBeInTheDocument()
@@ -845,6 +852,81 @@ describe('已知疾病', () => {
     const item = await screen.findByRole('listitem')
     expect(within(item).getByText('胃食道逆流')).toBeInTheDocument()
     expect(within(item).getByText('治療中／有症狀')).toBeInTheDocument()
+  })
+})
+
+describe('藥物與保健食品', () => {
+  const today = toDateString(new Date())
+
+  it('在設定登記後，每日紀錄出現並預設有吃；標沒吃後 AI 提示詞會寫出來', async () => {
+    const user = userEvent.setup()
+    vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue()
+    render(<App />)
+
+    await openTab(user, '設定')
+    const section = await screen.findByRole('region', { name: '藥物與保健食品' })
+    expect(within(section).getByText('還沒有登記。')).toBeInTheDocument()
+    await user.type(within(section).getByLabelText('名稱'), 'DHC 持續型維他命C')
+    await user.type(within(section).getByLabelText('劑量／用法'), '1000mg')
+    await user.click(within(section).getByRole('button', { name: '新增藥物' }))
+    expect(await within(section).findByText('已新增「DHC 持續型維他命C」')).toBeInTheDocument()
+    expect(within(section).getByText(`1000mg · ${today} 起`)).toBeInTheDocument()
+
+    await openTab(user, '今天')
+    const med = await screen.findByRole('button', { name: 'DHC 持續型維他命C' })
+    expect(med).toHaveAttribute('aria-pressed', 'true')
+    await user.click(med)
+    await user.click(screen.getByRole('button', { name: '儲存' }))
+    await screen.findByText(`已儲存 ${today} 的紀錄`)
+
+    await openTab(user, '設定')
+    await user.click(screen.getByRole('button', { name: '產生 AI 提示詞' }))
+    const prompt = await screen.findByLabelText<HTMLTextAreaElement>('提示詞')
+    expect(prompt.value).toContain(`- DHC 持續型維他命C（1000mg）：${today} 起`)
+    expect(prompt.value).toContain('- 固定用藥沒吃：DHC 持續型維他命C')
+  })
+
+  it('停吃後（最後一天在今天之前），每日紀錄不再出現；編輯、刪除與復原', async () => {
+    const user = userEvent.setup()
+    await db.medications.put({ id: 'm1', name: '魚油', startDate: '2026-01-01' })
+    render(<App />)
+    expect(await screen.findByRole('button', { name: '魚油' })).toBeInTheDocument()
+
+    await openTab(user, '設定')
+    const section = screen.getByRole('region', { name: '藥物與保健食品' })
+    await user.click(await within(section).findByRole('button', { name: '編輯 魚油' }))
+    await user.type(within(section).getByLabelText('最後一天（停吃時填）'), '2026-02-01')
+    await user.click(within(section).getByRole('button', { name: '更新藥物' }))
+    expect(await within(section).findByText(/2026-01-01～2026-02-01 · 已停吃/)).toBeInTheDocument()
+
+    await openTab(user, '今天')
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: '魚油' })).not.toBeInTheDocument(),
+    )
+
+    await openTab(user, '設定')
+    await user.click(within(section).getByRole('button', { name: '刪除 魚油' }))
+    expect(await within(section).findByText('已刪除「魚油」')).toBeInTheDocument()
+    expect(await db.medications.count()).toBe(0)
+    await user.click(within(section).getByRole('button', { name: '復原' }))
+    expect(await within(section).findByText('已復原「魚油」')).toBeInTheDocument()
+    expect(await db.medications.get('m1')).toMatchObject({ endDate: '2026-02-01' })
+  })
+
+  it('最後一天早於開始日期時不能儲存', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await openTab(user, '設定')
+    const section = await screen.findByRole('region', { name: '藥物與保健食品' })
+
+    await user.type(within(section).getByLabelText('名稱'), '鈣片')
+    await user.type(within(section).getByLabelText('最後一天（停吃時填）'), '2020-01-01')
+    await user.click(within(section).getByRole('button', { name: '新增藥物' }))
+
+    expect(
+      await within(section).findByText('請填寫名稱與開始日期；最後一天不能早於開始日期'),
+    ).toBeInTheDocument()
+    expect(await db.medications.count()).toBe(0)
   })
 })
 

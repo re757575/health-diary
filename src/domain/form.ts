@@ -22,6 +22,9 @@ export interface FormValues {
   tags: string[]
   mood: string
   symptomItems: SymptomItem[]
+  /** 固定用藥中這天沒吃的 id */
+  missedMedications: string[]
+  asNeededMedications: string[]
   symptoms: string
   notes: string
 }
@@ -80,6 +83,8 @@ export function emptyForm(date: string): FormValues {
     tags: [],
     mood: '',
     symptomItems: [],
+    missedMedications: [],
+    asNeededMedications: [],
     symptoms: '',
     notes: '',
   }
@@ -118,6 +123,8 @@ export function formToEntry(form: FormValues): Entry {
     tags: form.tags.length > 0 ? form.tags : undefined,
     mood: toNumber(form.mood),
     symptomItems: form.symptomItems.length > 0 ? form.symptomItems : undefined,
+    missedMedications: form.missedMedications.length > 0 ? form.missedMedications : undefined,
+    asNeededMedications: form.asNeededMedications.length > 0 ? form.asNeededMedications : undefined,
     symptoms: toText(form.symptoms),
     notes: toText(form.notes),
   }
@@ -153,6 +160,8 @@ export function entryToForm(entry: Entry): FormValues {
     tags: entry.tags ?? [],
     mood: str(entry.mood),
     symptomItems: entry.symptomItems ?? [],
+    missedMedications: entry.missedMedications ?? [],
+    asNeededMedications: entry.asNeededMedications ?? [],
     symptoms: entry.symptoms ?? '',
     notes: entry.notes ?? '',
   }

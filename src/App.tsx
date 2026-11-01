@@ -2,10 +2,17 @@ import { Box, Container, Stack, Tabs, Title } from '@mantine/core'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useEffect, useMemo, useState } from 'react'
 import { clearDraft } from '@/data/draft'
-import { getEntry, getLastBackupAt, getProfile, listEntries } from '@/data/repository'
+import {
+  getEntry,
+  getLastBackupAt,
+  getProfile,
+  listEntries,
+  listMedications,
+} from '@/data/repository'
 import { backupStatus } from '@/domain/backup'
 import { emptyForm, entryToForm, shiftDate, toDateString } from '@/domain/form'
 import { collectSymptomNames } from '@/domain/symptom'
+import { activeMedications, collectAsNeededNames } from '@/domain/medication'
 import { collectTagNames } from '@/domain/tag'
 import { weightOn } from '@/domain/weight'
 import { AboutSection } from './AboutSection'
@@ -15,6 +22,7 @@ import { DataTools } from './DataTools'
 import { findIncompleteDays } from '@/domain/quality'
 import { EntryForm } from './EntryForm'
 import { HistoryList } from './HistoryList'
+import { Medications } from './Medications'
 import { MissingNotice } from './MissingNotice'
 import { ProfileForm } from './ProfileForm'
 import { Section } from './Section'
@@ -34,6 +42,12 @@ export default function App() {
   const history = useLiveQuery(listEntries, [])
   const symptomNames = useMemo(() => collectSymptomNames(history ?? []), [history])
   const tagNames = useMemo(() => collectTagNames(history ?? []), [history])
+  const asNeededNames = useMemo(() => collectAsNeededNames(history ?? []), [history])
+  const medications = useLiveQuery(listMedications, [])
+  const todaysMedications = useMemo(
+    () => activeMedications(medications ?? [], date),
+    [medications, date],
+  )
   // 體重沒填的日子沿用之前最近一次，表單上提示會沿用多少
   const previousWeight = useMemo(
     () => weightOn(history ?? [], shiftDate(date, -1)),
@@ -149,6 +163,8 @@ export default function App() {
                   knownSymptoms={symptomNames}
                   knownTags={tagNames}
                   previousWeight={previousWeight}
+                  medications={todaysMedications}
+                  knownAsNeeded={asNeededNames}
                 />
               )}
             </Section>
@@ -166,6 +182,8 @@ export default function App() {
         <Tabs.Panel value="settings" pt="md">
           <Stack gap="md">
             <Conditions />
+
+            <Medications />
 
             <Section title="基本資料">{profile && <ProfileForm initial={profile.value} />}</Section>
 

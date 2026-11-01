@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { conditionSchema, type Condition } from './condition'
 import { entrySchema, type Entry } from './entry'
+import { medicationSchema, type Medication } from './medication'
 import { toDateString } from './form'
 import { profileSchema, type Profile } from './profile'
 import { daysBetween } from './trend'
@@ -8,30 +9,34 @@ import { daysBetween } from './trend'
 export const BACKUP_APP = 'health-diary'
 /**
  * v1 只有 entries；v2 新增 conditions 與 profile；v3 的紀錄多了 symptomItems（症狀與嚴重程度）、exerciseMinutes 與 tags；
- * v4 的紀錄多了 noBowel（確認當天沒有排便）。
+ * v4 的紀錄多了 noBowel（確認當天沒有排便）；v5 新增 medications（固定用藥），紀錄多了 missedMedications 與 asNeededMedications。
  * 匯入時各版本都接受：舊備份沒有的欄位都是選填
  */
-export const BACKUP_VERSION = 4
+export const BACKUP_VERSION = 5
 
 const backupSchema = z.object({
   app: z.literal(BACKUP_APP),
-  version: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4)]),
+  version: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4), z.literal(5)]),
   exportedAt: z.string(),
   entries: z.array(entrySchema),
   // 以下欄位 v1 備份沒有
   conditions: z.array(conditionSchema).default([]),
+  // v5 之前的備份沒有
+  medications: z.array(medicationSchema).default([]),
   profile: profileSchema.optional(),
 })
 
 export interface BackupData {
   entries: Entry[]
   conditions: Condition[]
+  /** 固定用藥；沒給視為沒有 */
+  medications?: Medication[]
   profile?: Profile
 }
 
 /** 序列化成可下載的備份 JSON，紀錄依日期由舊到新排序 */
 export function serializeBackup(
-  { entries, conditions, profile }: BackupData,
+  { entries, conditions, medications = [], profile }: BackupData,
   now: Date = new Date(),
 ): string {
   const sorted = [...entries].sort((a, b) => a.date.localeCompare(b.date))
@@ -42,6 +47,7 @@ export function serializeBackup(
       exportedAt: now.toISOString(),
       entries: sorted,
       conditions,
+      medications,
       profile,
     },
     null,
@@ -63,8 +69,8 @@ export function parseBackup(text: string): ParseBackupResult {
   if (!result.success) {
     return { ok: false, error: '檔案格式不符，不是本 App 匯出的備份檔' }
   }
-  const { entries, conditions, profile } = result.data
-  return { ok: true, entries, conditions, profile }
+  const { entries, conditions, medications, profile } = result.data
+  return { ok: true, entries, conditions, medications, profile }
 }
 
 export interface ImportPreview {

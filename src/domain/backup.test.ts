@@ -38,7 +38,7 @@ describe('備份匯出入', () => {
       conditions: [condition],
       profile: { birthday: '1990-05-20', heightCm: 175, sex: 'male' as const },
     }
-    expect(parseBackup(serializeBackup(data))).toEqual({ ok: true, ...data })
+    expect(parseBackup(serializeBackup(data))).toEqual({ ok: true, medications: [], ...data })
   })
 
   it('相容 v2 備份：紀錄沒有症狀項目也能匯入，內容原樣保留', () => {
@@ -68,8 +68,8 @@ describe('備份匯出入', () => {
     }
     const text = serializeBackup(data)
     expect(JSON.parse(text).version).toBe(BACKUP_VERSION)
-    expect(BACKUP_VERSION).toBe(4)
-    expect(parseBackup(text)).toEqual({ ok: true, ...data })
+    expect(BACKUP_VERSION).toBe(5)
+    expect(parseBackup(text)).toEqual({ ok: true, medications: [], ...data })
   })
 
   it('沒有填基本資料時，匯入後 profile 為 undefined（不會蓋掉現有的）', () => {
@@ -102,7 +102,12 @@ describe('備份匯出入', () => {
       entries: [entry('2026-09-30')],
     })
     const result = parseBackup(v1)
-    expect(result).toEqual({ ok: true, entries: [entry('2026-09-30')], conditions: [] })
+    expect(result).toMatchObject({
+      ok: true,
+      entries: [entry('2026-09-30')],
+      conditions: [],
+      medications: [],
+    })
   })
 
   it('拒絕非 JSON 的內容', () => {
@@ -187,5 +192,29 @@ describe('previewImport', () => {
     const parsed = parseBackup(serializeBackup({ entries: existing, conditions: [] }))
     if (!parsed.ok) throw new Error(parsed.error)
     expect(previewImport(parsed.entries, existing)).toEqual({ added: [], replaced: [] })
+  })
+})
+
+describe('備份：固定用藥', () => {
+  it('固定用藥與每天的沒吃、臨時用藥都會匯出再匯入', () => {
+    const medications = [
+      { id: 'm1', name: 'DHC 持續型維他命C', dose: '1000mg', startDate: '2026-10-20' },
+    ]
+    const entries = [
+      entry('2026-10-28', { missedMedications: ['m1'], asNeededMedications: ['普拿疼'] }),
+    ]
+    const parsed = parseBackup(serializeBackup({ entries, conditions: [], medications }))
+    expect(parsed).toMatchObject({ ok: true, entries, medications })
+  })
+
+  it('v4 以前的備份沒有 medications，視為沒有固定用藥', () => {
+    const v4 = JSON.stringify({
+      app: 'health-diary',
+      version: 4,
+      exportedAt: '2026-10-31T00:00:00.000Z',
+      entries: [entry('2026-10-28', { noBowel: true })],
+      conditions: [],
+    })
+    expect(parseBackup(v4)).toMatchObject({ ok: true, medications: [] })
   })
 })

@@ -3,13 +3,14 @@ import {
   Button,
   Divider,
   Group,
+  Input,
   Paper,
   Stack,
   Text,
   Textarea,
   TextInput,
 } from '@mantine/core'
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useId, useState, type FormEvent } from 'react'
 import { clearDraft, loadDraft, saveDraft, type Draft } from '@/data/draft'
 import { getEntry, saveEntry } from '@/data/repository'
 import {
@@ -41,7 +42,9 @@ import { TagPicker } from './TagPicker'
 import { Status } from './Status'
 import { TimeField } from './TimeField'
 import { PRESET_SYMPTOMS } from '@/domain/symptom'
-import { PRESET_TAGS } from '@/domain/tag'
+import type { Medication } from '@/domain/medication'
+import { PRESET_TAGS, addTag, toggleTag } from '@/domain/tag'
+import { ChipChoices } from './ChipChoices'
 import { isSuspectWeight, type DayWeight } from '@/domain/weight'
 import { useStatus } from './useStatus'
 
@@ -55,6 +58,10 @@ interface Props {
   knownSymptoms?: readonly string[]
   /** 狀況標籤的候選清單；沒給就只有預設標籤 */
   knownTags?: readonly string[]
+  /** 這天該吃的固定用藥（設定裡登記、期間包含這天的） */
+  medications?: readonly Medication[]
+  /** 臨時用藥的候選清單（過去用過的） */
+  knownAsNeeded?: readonly string[]
   /** 這天之前最近一次量的體重；體重沒填時沿用它，顯示在欄位提示 */
   previousWeight?: DayWeight
 }
@@ -77,7 +84,10 @@ export function EntryForm({
   knownSymptoms = PRESET_SYMPTOMS,
   knownTags = PRESET_TAGS,
   previousWeight,
+  medications = [],
+  knownAsNeeded = [],
 }: Props) {
+  const medicationsLabelId = useId()
   // 上次沒儲存就離開（例如切到別的 App 被系統關掉）的內容；和已存的不同才還原。
   // 合併空表單是為了補上舊版草稿沒有的欄位
   const [restored, setRestored] = useState<Draft | undefined>(() => {
@@ -460,6 +470,64 @@ export function EntryForm({
             </Button>
           )}
         </Group>
+
+        <Divider
+          label="用藥"
+          labelPosition="left"
+          mt="xs"
+          classNames={{ label: 'section-label' }}
+        />
+        {medications.length > 0 ? (
+          <div>
+            <Input.Label id={medicationsLabelId} labelElement="div">
+              固定吃的藥
+            </Input.Label>
+            <Text size="xs" c="dimmed" mb={4}>
+              預設都有吃，沒吃的點一下
+            </Text>
+            <Group role="group" aria-labelledby={medicationsLabelId} gap="xs">
+              {medications.map((m) => {
+                const taken = !form.missedMedications.includes(m.id)
+                // 無障礙名稱固定是藥名，有沒有吃由 aria-pressed 表達；「沒吃」字樣只給看得到的人
+                return (
+                  <Button
+                    key={m.id}
+                    type="button"
+                    size="compact-md"
+                    variant={taken ? 'light' : 'default'}
+                    aria-pressed={taken}
+                    td={taken ? undefined : 'line-through'}
+                    onClick={() =>
+                      set('missedMedications', toggleTag(form.missedMedications, m.id))
+                    }
+                  >
+                    {taken && (
+                      <span aria-hidden="true" style={{ marginRight: '0.25em' }}>
+                        ✓
+                      </span>
+                    )}
+                    {m.name}
+                    {!taken && <span aria-hidden="true">（沒吃）</span>}
+                  </Button>
+                )
+              })}
+            </Group>
+          </div>
+        ) : (
+          <Text size="sm" c="dimmed">
+            每天固定吃的藥或保健食品，可以到「設定」登記
+          </Text>
+        )}
+        <ChipChoices
+          label="臨時用藥"
+          known={knownAsNeeded}
+          selected={form.asNeededMedications}
+          onToggle={(name) => set('asNeededMedications', toggleTag(form.asNeededMedications, name))}
+          onAdd={(name) => set('asNeededMedications', addTag(form.asNeededMedications, name))}
+          addLabel="新增其他臨時用藥"
+          addPlaceholder="例如：普拿疼"
+          addButtonLabel="新增臨時用藥"
+        />
 
         <Divider
           label="整體狀況"

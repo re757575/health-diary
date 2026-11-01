@@ -97,6 +97,10 @@ export const entrySchema = z.object({
   tags: z.array(z.string().trim().min(1)).optional(),
   /** 選取的症狀與嚴重程度（v3 新增，舊紀錄沒有） */
   symptomItems: z.array(symptomItemSchema).optional(),
+  /** 固定用藥（Medication）中這天沒吃的 id；固定用藥預設每天都有吃（v6 新增） */
+  missedMedications: z.array(z.string().min(1)).optional(),
+  /** 這天臨時吃的藥，例如止痛藥（v6 新增） */
+  asNeededMedications: z.array(z.string().trim().min(1)).optional(),
   /** 症狀的文字補充；v3 之前所有症狀都寫在這裡 */
   symptoms: z.string().optional(),
   notes: z.string().optional(),
