@@ -2,6 +2,11 @@
 
 本檔案由 [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) 依照 [Conventional Commits](https://www.conventionalcommits.org/) 規範的 commit 訊息自動產生，請勿手動編輯內容，執行 `npm run release` 即可更新。
 
+## [0.1.16](https://github.com/re757575/health-diary/compare/v0.1.15...v0.1.16) (2026-11-01)
+
+### Features
+
+* **visit:** 新增就醫紀錄，記下每次看診的症狀、診所、醫師與醫囑 ([73bfe59](https://github.com/re757575/health-diary/commit/73bfe597b6ac2383893ac09a9ba5266a52818c70))
 ## [0.1.15](https://github.com/re757575/health-diary/compare/v0.1.14...v0.1.15) (2026-11-01)
 
 ### Features
