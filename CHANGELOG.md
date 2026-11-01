@@ -2,6 +2,11 @@
 
 本檔案由 [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) 依照 [Conventional Commits](https://www.conventionalcommits.org/) 規範的 commit 訊息自動產生，請勿手動編輯內容，執行 `npm run release` 即可更新。
 
+## [0.1.17](https://github.com/re757575/health-diary/compare/v0.1.16...v0.1.17) (2026-11-01)
+
+### Features
+
+* **ui:** 資料越記越多的區塊預設只列最近幾筆，其餘收合 ([ca3939f](https://github.com/re757575/health-diary/commit/ca3939f26c2ba747ebf0b46bae0f15f5b4a8d6f8))
 ## [0.1.16](https://github.com/re757575/health-diary/compare/v0.1.15...v0.1.16) (2026-11-01)
 
 ### Features
