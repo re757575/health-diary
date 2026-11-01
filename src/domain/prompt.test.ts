@@ -257,6 +257,44 @@ describe('用藥', () => {
   })
 })
 
+describe('就醫紀錄', () => {
+  const visit = {
+    id: 'v1',
+    date: '2026-10-27',
+    facility: '安心診所',
+    department: '耳鼻喉科',
+    doctor: '王醫師',
+    symptoms: '喉嚨痛',
+    diagnosis: '急性咽喉炎',
+    advice: '多喝水\n避免辛辣',
+    followUpDate: '2026-11-03',
+  }
+
+  it('列出分析期間內的看診，多行的醫囑併成一行；期間外的不列', () => {
+    const prompt = buildAnalysisPrompt([entry('2026-10-26'), entry('2026-10-28')], {
+      visits: [visit, { id: 'v2', date: '2026-09-01', facility: '台大醫院' }],
+    })
+    expect(prompt).toContain(
+      [
+        '# 就醫紀錄',
+        '## 2026-10-27 安心診所（耳鼻喉科，王醫師）',
+        '- 症狀：喉嚨痛',
+        '- 診斷：急性咽喉炎',
+        '- 醫囑：多喝水；避免辛辣',
+        '- 下次回診：2026-11-03',
+      ].join('\n'),
+    )
+    expect(prompt).not.toContain('台大醫院')
+    expect(prompt.indexOf('# 就醫紀錄')).toBeLessThan(prompt.indexOf('# 每日紀錄'))
+  })
+
+  it('期間內沒有看診時不加這一段', () => {
+    expect(buildAnalysisPrompt([entry('2026-10-28')], { visits: [visit] })).not.toContain(
+      '# 就醫紀錄',
+    )
+  })
+})
+
 describe('餐點', () => {
   it('食物與份量在前、備註在後；只有備註的餐點照樣列出', () => {
     const prompt = buildAnalysisPrompt([

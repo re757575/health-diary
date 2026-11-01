@@ -14,7 +14,7 @@ import App from './App'
 const appUpdate = vi.hoisted(() => ({ updateReady: false, applyUpdate: vi.fn() }))
 vi.mock('./useAppUpdate', () => ({ useAppUpdate: () => appUpdate }))
 
-const openTab = (user: UserEvent, name: '今天' | '趨勢' | '報告' | '設定') =>
+const openTab = (user: UserEvent, name: '今天' | '趨勢' | '就醫' | '報告' | '設定') =>
   user.click(screen.getByRole('tab', { name }))
 
 beforeEach(async () => {
@@ -27,6 +27,7 @@ beforeEach(async () => {
     db.meta.clear(),
     db.medications.clear(),
     db.foods.clear(),
+    db.visits.clear(),
   ])
 })
 
@@ -156,12 +157,13 @@ describe('分頁', () => {
       '藥物與保健食品',
       '基本資料',
       'AI 分析與資料備份',
+      '記錄就醫',
     ]) {
       expect(screen.queryByRole('region', { name })).not.toBeInTheDocument()
     }
   })
 
-  it('各分頁放的區塊：趨勢有趨勢圖與歷史紀錄，設定有疾病、用藥、基本資料、備份與關於', async () => {
+  it('各分頁放的區塊：趨勢有趨勢圖與歷史紀錄，就醫有表單與清單，設定有疾病、用藥、基本資料、備份與關於', async () => {
     const user = userEvent.setup()
     render(<App />)
 
@@ -169,6 +171,10 @@ describe('分頁', () => {
     expect(await screen.findByRole('region', { name: '最近 30 天趨勢' })).toBeInTheDocument()
     expect(screen.getByRole('region', { name: '歷史紀錄' })).toBeInTheDocument()
     expect(screen.queryByRole('region', { name: '每日紀錄' })).not.toBeInTheDocument()
+
+    await openTab(user, '就醫')
+    expect(await screen.findByRole('region', { name: '記錄就醫' })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: '就醫紀錄' })).toBeInTheDocument()
 
     await openTab(user, '設定')
     for (const name of [
@@ -1122,6 +1128,167 @@ describe('就醫報告', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('開始日期不能晚於結束日期')
     expect(screen.getByRole('button', { name: '列印／存成 PDF' })).toBeDisabled()
     expect(screen.queryByRole('region', { name: '健康紀錄報告' })).not.toBeInTheDocument()
+  })
+})
+
+describe('就醫紀錄', () => {
+  const today = toDateString(new Date())
+
+  it('新增 → 清單顯示 → 編輯 → 刪除 → 復原；新增過的診所之後可以直接選', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await openTab(user, '就醫')
+    const form = await screen.findByRole('region', { name: '記錄就醫' })
+    const list = screen.getByRole('region', { name: '就醫紀錄' })
+    expect(await within(list).findByText('還沒有就醫紀錄。')).toBeInTheDocument()
+
+    expect(within(form).getByLabelText('就醫日期')).toHaveValue(today)
+    await user.type(within(form).getByLabelText('診所／醫院'), '安心診所')
+    await user.type(within(form).getByLabelText('科別'), '耳鼻喉科')
+    await user.type(within(form).getByLabelText('看診醫師'), '王醫師')
+    await user.type(within(form).getByLabelText('症狀／看診原因'), '喉嚨痛')
+    await user.type(within(form).getByLabelText('診斷'), '急性咽喉炎')
+    await user.type(within(form).getByLabelText('醫囑'), '多喝水{Enter}避免辛辣')
+    await user.type(within(form).getByLabelText('處方用藥'), '消炎藥 3 天')
+    await user.click(within(form).getByRole('button', { name: '新增就醫紀錄' }))
+
+    expect(await within(form).findByText(`已新增 ${today} 的就醫紀錄`)).toBeInTheDocument()
+    expect(within(form).getByLabelText('診所／醫院')).toHaveValue('')
+    const item = await within(list).findByRole('listitem')
+    expect(item).toHaveTextContent('安心診所（耳鼻喉科，王醫師）')
+    expect(item).toHaveTextContent('診斷：急性咽喉炎')
+    expect(item).toHaveTextContent('醫囑：多喝水 避免辛辣')
+    expect(item).toHaveTextContent('處方：消炎藥 3 天')
+    // 填過的診所變成可選的選項
+    const facility = within(form).getByLabelText('診所／醫院')
+    expect(document.getElementById(facility.getAttribute('list')!)).toContainHTML(
+      '<option value="安心診所">',
+    )
+
+    await user.click(within(list).getByRole('button', { name: `編輯 ${today} 安心診所` }))
+    expect(within(form).getByLabelText('診斷')).toHaveValue('急性咽喉炎')
+    await user.clear(within(form).getByLabelText('診斷'))
+    await user.type(within(form).getByLabelText('診斷'), '病毒性咽喉炎')
+    await user.click(within(form).getByRole('button', { name: '更新就醫紀錄' }))
+    expect(await within(list).findByText('病毒性咽喉炎')).toBeInTheDocument()
+    expect(await db.visits.count()).toBe(1) // 更新而不是新增一筆
+
+    await user.click(within(list).getByRole('button', { name: `刪除 ${today} 安心診所` }))
+    expect(await within(list).findByText(`已刪除 ${today} 的就醫紀錄`)).toBeInTheDocument()
+    expect(await db.visits.count()).toBe(0)
+    await user.click(within(list).getByRole('button', { name: '復原' }))
+    expect(await within(list).findByText(`已復原 ${today} 的就醫紀錄`)).toBeInTheDocument()
+    expect((await db.visits.toArray())[0]).toMatchObject({
+      facility: '安心診所',
+      diagnosis: '病毒性咽喉炎',
+      advice: '多喝水\n避免辛辣',
+    })
+  })
+
+  it('沒填診所、或回診日期早於就醫日期時不能儲存', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await openTab(user, '就醫')
+    const form = await screen.findByRole('region', { name: '記錄就醫' })
+
+    await user.type(within(form).getByLabelText('診所／醫院'), '安心診所')
+    await user.type(within(form).getByLabelText('下次回診日期'), shiftDate(today, -1))
+    await user.click(within(form).getByRole('button', { name: '新增就醫紀錄' }))
+
+    expect(
+      await within(form).findByText('請填寫就醫日期與診所／醫院；回診日期不能早於就醫日期'),
+    ).toBeInTheDocument()
+    expect(await db.visits.count()).toBe(0)
+  })
+
+  it('帶入這天每日紀錄的症狀；沒記症狀時說明', async () => {
+    const user = userEvent.setup()
+    await db.entries.put({
+      date: today,
+      meals: [],
+      bowel: [],
+      symptomItems: [{ name: '頭痛', severity: 2 }],
+      symptoms: '早上比較嚴重',
+    })
+    render(<App />)
+    await openTab(user, '就醫')
+    const form = await screen.findByRole('region', { name: '記錄就醫' })
+
+    await user.click(within(form).getByRole('button', { name: '帶入這天每日紀錄的症狀' }))
+    await waitFor(() =>
+      expect(within(form).getByLabelText('症狀／看診原因')).toHaveValue('頭痛（中）；早上比較嚴重'),
+    )
+
+    await user.clear(within(form).getByLabelText('就醫日期'))
+    await user.type(within(form).getByLabelText('就醫日期'), shiftDate(today, -1))
+    await user.click(within(form).getByRole('button', { name: '帶入這天每日紀錄的症狀' }))
+    expect(
+      await within(form).findByText(`${shiftDate(today, -1)} 的每日紀錄沒有記下症狀`),
+    ).toBeInTheDocument()
+  })
+
+  it('回診前 3 天在「今天」提醒，點了切到「就醫」；還早的不提醒', async () => {
+    const user = userEvent.setup()
+    await db.visits.bulkPut([
+      {
+        id: 'a',
+        date: shiftDate(today, -7),
+        facility: '安心診所',
+        followUpDate: shiftDate(today, 1),
+      },
+      {
+        id: 'b',
+        date: shiftDate(today, -7),
+        facility: '台大醫院',
+        followUpDate: shiftDate(today, 10),
+      },
+    ])
+    render(<App />)
+
+    const notice = await screen.findByRole('region', { name: '回診提醒' })
+    expect(notice).toHaveTextContent('明天要回診：安心診所')
+    expect(notice).not.toHaveTextContent('台大醫院')
+
+    await user.click(within(notice).getByRole('button', { name: '看就醫紀錄' }))
+    expect(screen.getByRole('tab', { name: '就醫' })).toHaveAttribute('aria-selected', 'true')
+    // 「就醫」分頁列出所有還沒到的回診
+    const upcoming = await screen.findByRole('region', { name: '即將回診' })
+    expect(upcoming).toHaveTextContent('（明天）：安心診所')
+    expect(upcoming).toHaveTextContent('（10 天後）：台大醫院')
+  })
+
+  it('就醫報告列出期間內的看診；匯入含就醫紀錄的備份時說明筆數', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await openTab(user, '設定')
+    const backup = serializeBackup({
+      entries: [],
+      conditions: [],
+      visits: [
+        {
+          id: 'v1',
+          date: shiftDate(today, -3),
+          facility: '安心診所',
+          department: '家醫科',
+          diagnosis: '感冒',
+          advice: '多休息',
+        },
+        { id: 'v2', date: shiftDate(today, -60), facility: '台大醫院' },
+      ],
+    })
+    await user.upload(
+      await screen.findByLabelText('匯入備份'),
+      new File([backup], 'backup.json', { type: 'application/json' }),
+    )
+    expect(await screen.findByText('已匯入 0 筆紀錄與 2 筆就醫紀錄')).toBeInTheDocument()
+
+    await openTab(user, '報告')
+    const visits = await screen.findByRole('region', { name: '就醫紀錄' })
+    expect(visits).toHaveTextContent(`${shiftDate(today, -3)}`)
+    expect(visits).toHaveTextContent('安心診所（家醫科）')
+    expect(visits).toHaveTextContent('診斷：感冒')
+    expect(visits).toHaveTextContent('醫囑：多休息')
+    expect(visits).not.toHaveTextContent('台大醫院')
   })
 })
 

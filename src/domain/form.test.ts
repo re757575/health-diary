@@ -11,6 +11,7 @@ import {
   shiftDate,
   toDateString,
   toTimeString,
+  withWeekday,
 } from './form'
 
 describe('toDateString', () => {
@@ -28,6 +29,13 @@ describe('shiftDate', () => {
 
   it('移動 0 天維持原日期', () => {
     expect(shiftDate('2026-10-29', 0)).toBe('2026-10-29')
+  })
+})
+
+describe('withWeekday', () => {
+  it('日期後面加上星期幾', () => {
+    expect(withWeekday('2026-10-28')).toBe('2026-10-28（三）')
+    expect(withWeekday('2026-11-01')).toBe('2026-11-01（日）')
   })
 })
 

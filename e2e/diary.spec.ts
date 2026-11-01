@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test'
 
-const openTab = (page: Page, name: '今天' | '趨勢' | '報告' | '設定') =>
+const openTab = (page: Page, name: '今天' | '趨勢' | '就醫' | '報告' | '設定') =>
   page.getByRole('tab', { name }).click()
 
 /** 在某一餐輸入食物名稱並加入（預設 1 份） */
@@ -702,4 +702,42 @@ test('就醫報告：選期間後整理重點，列印時只印報告', async ({
   await expect(page.getByRole('tab', { name: '報告' })).toBeHidden()
   await expect(page.getByRole('button', { name: '列印／存成 PDF' })).toBeHidden()
   await expect(page.getByRole('region', { name: '期間摘要' })).toBeVisible()
+})
+
+test('就醫紀錄：帶入當天症狀 → 填診所與醫囑 → 重新整理仍在 → 進就醫報告與 AI 提示詞', async ({
+  page,
+}) => {
+  await page.goto('./')
+  await page.getByRole('group', { name: '症狀' }).getByRole('button', { name: '頭痛' }).click()
+  await page.getByRole('button', { name: '儲存', exact: true }).click()
+  await expect(page.getByText(/已儲存 \d{4}-\d{2}-\d{2} 的紀錄/)).toBeVisible()
+
+  await openTab(page, '就醫')
+  const form = page.getByRole('region', { name: '記錄就醫' })
+  await form.getByRole('button', { name: '帶入這天每日紀錄的症狀' }).click()
+  await expect(form.getByLabel('症狀／看診原因')).toHaveValue('頭痛（輕）')
+  await form.getByLabel('診所／醫院').fill('安心診所')
+  await form.getByLabel('科別').fill('神經內科')
+  await form.getByLabel('看診醫師').fill('王醫師')
+  await form.getByLabel('診斷').fill('緊張型頭痛')
+  await form.getByLabel('醫囑').fill('規律作息\n避免長時間低頭')
+  await form.getByRole('button', { name: '新增就醫紀錄' }).click()
+  await expect(form.getByText(/已新增 \d{4}-\d{2}-\d{2} 的就醫紀錄/)).toBeVisible()
+
+  await page.reload()
+  await openTab(page, '就醫')
+  const list = page.getByRole('region', { name: '就醫紀錄' })
+  await expect(list).toContainText('安心診所（神經內科，王醫師）')
+  await expect(list).toContainText('診斷：緊張型頭痛')
+
+  await openTab(page, '報告')
+  const report = page.getByRole('region', { name: '就醫紀錄' })
+  await expect(report).toContainText('安心診所（神經內科，王醫師）')
+  await expect(report).toContainText('醫囑：規律作息')
+
+  await openTab(page, '設定')
+  await page.getByRole('button', { name: '產生 AI 提示詞' }).click()
+  const prompt = page.getByLabel('提示詞')
+  await expect(prompt).toContainText('# 就醫紀錄')
+  await expect(prompt).toContainText('- 醫囑：規律作息；避免長時間低頭')
 })

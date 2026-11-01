@@ -6,15 +6,17 @@ import { medicationSchema, type Medication } from './medication'
 import { toDateString } from './form'
 import { profileSchema, type Profile } from './profile'
 import { daysBetween } from './trend'
+import { visitSchema, type Visit } from './visit'
 
 export const BACKUP_APP = 'health-diary'
 /**
  * v1 只有 entries；v2 新增 conditions 與 profile；v3 的紀錄多了 symptomItems（症狀與嚴重程度）、exerciseMinutes 與 tags；
  * v4 的紀錄多了 noBowel（確認當天沒有排便）；v5 新增 medications（固定用藥），紀錄多了 missedMedications 與 asNeededMedications；
- * v6 新增 foods（常吃的食物清單），餐點改成一項項的食物與份量（舊版的文字餐點匯入時會自動拆開）。
+ * v6 新增 foods（常吃的食物清單），餐點改成一項項的食物與份量（舊版的文字餐點匯入時會自動拆開）；
+ * v7 新增 visits（就醫紀錄）。
  * 匯入時各版本都接受：舊備份沒有的欄位都是選填
  */
-export const BACKUP_VERSION = 6
+export const BACKUP_VERSION = 7
 
 const backupSchema = z.object({
   app: z.literal(BACKUP_APP),
@@ -25,6 +27,7 @@ const backupSchema = z.object({
     z.literal(4),
     z.literal(5),
     z.literal(6),
+    z.literal(7),
   ]),
   exportedAt: z.string(),
   entries: z.array(entrySchema),
@@ -34,6 +37,8 @@ const backupSchema = z.object({
   medications: z.array(medicationSchema).default([]),
   // v6 之前的備份沒有
   foods: z.array(z.string().trim().min(1)).default([]),
+  // v7 之前的備份沒有
+  visits: z.array(visitSchema).default([]),
   profile: profileSchema.optional(),
 })
 
@@ -44,12 +49,14 @@ export interface BackupData {
   medications?: Medication[]
   /** 常吃的食物清單；沒給視為沒有 */
   foods?: string[]
+  /** 就醫紀錄；沒給視為沒有 */
+  visits?: Visit[]
   profile?: Profile
 }
 
 /** 序列化成可下載的備份 JSON，紀錄依日期由舊到新排序 */
 export function serializeBackup(
-  { entries, conditions, medications = [], foods = [], profile }: BackupData,
+  { entries, conditions, medications = [], foods = [], visits = [], profile }: BackupData,
   now: Date = new Date(),
 ): string {
   const sorted = [...entries].sort((a, b) => a.date.localeCompare(b.date))
@@ -62,6 +69,7 @@ export function serializeBackup(
       conditions,
       medications,
       foods,
+      visits,
       profile,
     },
     null,
@@ -83,13 +91,13 @@ export function parseBackup(text: string): ParseBackupResult {
   if (!result.success) {
     return { ok: false, error: '檔案格式不符，不是本 App 匯出的備份檔' }
   }
-  const { version, conditions, medications, foods, profile } = result.data
+  const { version, conditions, medications, foods, visits, profile } = result.data
   // v6 之前的餐點是整段文字，拆成一項項的食物；v6 之後只有備註的餐點是刻意的，不能再拆
   const entries =
     version < 6
       ? result.data.entries.map((e) => ({ ...e, meals: e.meals.map(convertLegacyMeal) }))
       : result.data.entries
-  return { ok: true, entries, conditions, medications, foods, profile }
+  return { ok: true, entries, conditions, medications, foods, visits, profile }
 }
 
 export interface ImportPreview {

@@ -42,6 +42,7 @@ describe('備份匯出入', () => {
       ok: true,
       medications: [],
       foods: [],
+      visits: [],
       ...data,
     })
   })
@@ -73,8 +74,14 @@ describe('備份匯出入', () => {
     }
     const text = serializeBackup(data)
     expect(JSON.parse(text).version).toBe(BACKUP_VERSION)
-    expect(BACKUP_VERSION).toBe(6)
-    expect(parseBackup(text)).toEqual({ ok: true, medications: [], foods: [], ...data })
+    expect(BACKUP_VERSION).toBe(7)
+    expect(parseBackup(text)).toEqual({
+      ok: true,
+      medications: [],
+      foods: [],
+      visits: [],
+      ...data,
+    })
   })
 
   it('沒有填基本資料時，匯入後 profile 為 undefined（不會蓋掉現有的）', () => {
@@ -271,5 +278,44 @@ describe('備份：舊版的文字餐點', () => {
     expect(parsed.ok && parsed.entries[0]!.meals).toEqual([
       { type: 'breakfast', description: '外食 早餐店' },
     ])
+  })
+})
+
+describe('備份：就醫紀錄', () => {
+  it('就醫紀錄會匯出再匯入；v6 以前的備份沒有，視為沒有', () => {
+    const visits = [
+      {
+        id: 'v1',
+        date: '2026-10-28',
+        facility: '安心診所',
+        department: '耳鼻喉科',
+        diagnosis: '急性咽喉炎',
+        advice: '多喝水',
+        followUpDate: '2026-11-04',
+      },
+    ]
+    expect(parseBackup(serializeBackup({ entries: [], conditions: [], visits }))).toMatchObject({
+      ok: true,
+      visits,
+    })
+
+    const v6 = JSON.stringify({
+      app: 'health-diary',
+      version: 6,
+      exportedAt: '2026-10-31T00:00:00.000Z',
+      entries: [],
+    })
+    expect(parseBackup(v6)).toMatchObject({ ok: true, visits: [] })
+  })
+
+  it('就醫紀錄有任何一筆不合法就整份拒絕', () => {
+    const text = JSON.stringify({
+      app: 'health-diary',
+      version: 7,
+      exportedAt: '2026-10-31T00:00:00.000Z',
+      entries: [],
+      visits: [{ id: 'v1', date: '2026-10-28', facility: '' }],
+    })
+    expect(parseBackup(text).ok).toBe(false)
   })
 })

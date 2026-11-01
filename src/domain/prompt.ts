@@ -4,11 +4,12 @@ import { formatPeriod, medicationsDuring, type Medication } from './medication'
 import { SEX_LABELS, ageOn, type Profile } from './profile'
 import { toDateString } from './form'
 import { findLongSleeps, missingFields } from './quality'
+import { describeVisit, visitDetails, visitsDuring, type Visit } from './visit'
 import { findSuspectWeights, weightOn } from './weight'
 
 const INSTRUCTIONS = `你是一位細心的健康數據分析助理。以下是我的每日飲食與健康紀錄，請協助分析：
 
-1. 找出飲食、睡眠、排便、體重、用藥、心情／症狀之間可能的關聯與規律（例如某些食物後隔天的排便或症狀變化）。症狀後括號內的輕／中／重是我自評的嚴重程度。若有提供「基本資料」、「已知疾病」與「固定服用的藥物與保健食品」，請納入考量。
+1. 找出飲食、睡眠、排便、體重、用藥、心情／症狀之間可能的關聯與規律（例如某些食物後隔天的排便或症狀變化）。症狀後括號內的輕／中／重是我自評的嚴重程度。若有提供「基本資料」、「已知疾病」、「固定服用的藥物與保健食品」與「就醫紀錄」，請納入考量（就醫紀錄的診斷與醫囑是醫師的意見，請以此為準，不要和醫師的判斷矛盾）。
 2. 指出值得留意的異常或趨勢，並說明你判斷的依據（引用日期與數值）。
 3. 資料不足以下結論的地方請明說，不要臆測。
 4. 提出可以進一步追蹤或調整的具體建議，以及需要補充記錄的項目。
@@ -140,6 +141,18 @@ function formatMedications(medications: Medication[]): string | undefined {
   return `# 固定服用的藥物與保健食品\n以下在列出的期間內每天都有吃；每日紀錄寫「固定用藥沒吃」的那天例外。\n${lines.join('\n')}`
 }
 
+/** 就醫紀錄段落：分析期間內的看診，由舊到新；沒有就不加這一段 */
+function formatVisits(visits: Visit[]): string | undefined {
+  if (visits.length === 0) return undefined
+  const items = visits.map((v) =>
+    [
+      `## ${v.date} ${describeVisit(v)}`,
+      ...visitDetails(v).map((d) => `- ${d.label}：${d.value.replace(/\s*\n\s*/g, '；')}`),
+    ].join('\n'),
+  )
+  return `# 就醫紀錄\n${items.join('\n\n')}`
+}
+
 function formatCondition(condition: Condition): string {
   const details = [
     condition.since ? `${condition.since} 起` : undefined,
@@ -164,6 +177,8 @@ function formatProfile(profile: Profile | undefined, today: Date): string | unde
 export interface PromptOptions {
   /** 固定用藥；分析期間內有在吃的才列出 */
   medications?: Medication[]
+  /** 就醫紀錄；分析期間內的才列出 */
+  visits?: Visit[]
   /** 已知疾病；有填寫才會加上「已知疾病」段落 */
   conditions?: Condition[]
   /** 基本資料；全部沒填就不會加上「基本資料」段落 */
@@ -186,6 +201,7 @@ export function buildAnalysisPrompt(
   {
     conditions = [],
     medications = [],
+    visits = [],
     profile,
     today = new Date(),
     history = entries,
@@ -193,18 +209,20 @@ export function buildAnalysisPrompt(
 ): string {
   if (entries.length === 0) return ''
   const sorted = [...entries].sort((a, b) => a.date.localeCompare(b.date))
-  const range = `${sorted[0].date} ～ ${sorted[sorted.length - 1].date}（共 ${sorted.length} 天有紀錄）`
   const profileSection = formatProfile(profile, today)
   const qualitySection = formatQuality(sorted, history, today)
   const medicationNames = new Map(medications.map((m) => [m.id, m.name]))
-  const medicationSection = formatMedications(
-    medicationsDuring(medications, sorted[0].date, sorted[sorted.length - 1].date),
-  )
+  const first = sorted[0].date
+  const last = sorted[sorted.length - 1].date
+  const range = `${first} ～ ${last}（共 ${sorted.length} 天有紀錄）`
+  const medicationSection = formatMedications(medicationsDuring(medications, first, last))
+  const visitSection = formatVisits(visitsDuring(visits, first, last))
   return [
     INSTRUCTIONS,
     ...(profileSection ? [profileSection] : []),
     ...(conditions.length > 0 ? [`# 已知疾病\n${conditions.map(formatCondition).join('\n')}`] : []),
     ...(medicationSection ? [medicationSection] : []),
+    ...(visitSection ? [visitSection] : []),
     `# 紀錄期間\n${range}`,
     ...(qualitySection ? [qualitySection] : []),
     '# 每日紀錄',

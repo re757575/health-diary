@@ -4,6 +4,7 @@ import type { Entry } from '@/domain/entry'
 import { uniqueFoods } from '@/domain/food'
 import type { Medication } from '@/domain/medication'
 import type { Profile } from '@/domain/profile'
+import { sortVisits, type Visit } from '@/domain/visit'
 import { PROFILE_ID, db, type StoredFood } from './db'
 
 /** 全部紀錄，日期由新到舊 */
@@ -54,6 +55,20 @@ export async function saveMedication(medication: Medication): Promise<void> {
 
 export async function deleteMedication(id: string): Promise<void> {
   await db.medications.delete(id)
+}
+
+/** 全部就醫紀錄，由新到舊 */
+export async function listVisits(): Promise<Visit[]> {
+  return sortVisits(await db.visits.toArray())
+}
+
+/** 新增或更新（id 相同就覆蓋） */
+export async function saveVisit(visit: Visit): Promise<void> {
+  await db.visits.put(visit)
+}
+
+export async function deleteVisit(id: string): Promise<void> {
+  await db.visits.delete(id)
 }
 
 /** 常吃的食物清單，依加入的順序 */
@@ -108,15 +123,17 @@ export async function importBackup({
   conditions,
   medications = [],
   foods = [],
+  visits = [],
   profile,
 }: BackupData): Promise<void> {
   await db.transaction(
     'rw',
-    [db.entries, db.conditions, db.medications, db.foods, db.profile],
+    [db.entries, db.conditions, db.medications, db.foods, db.visits, db.profile],
     async () => {
       await db.entries.bulkPut(entries)
       await db.conditions.bulkPut(conditions)
       await db.medications.bulkPut(medications)
+      await db.visits.bulkPut(visits)
       await addFoods(foods)
       if (profile) await db.profile.put({ ...profile, id: PROFILE_ID })
     },

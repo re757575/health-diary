@@ -8,6 +8,7 @@ import {
   listConditions,
   listEntries,
   listMedications,
+  listVisits,
 } from '@/data/repository'
 import { describeLastBackup, parseBackup, previewImport, type BackupData } from '@/domain/backup'
 import { buildAnalysisPrompt, recentEntries } from '@/domain/prompt'
@@ -75,10 +76,13 @@ export function DataTools() {
       return
     }
     await importBackup(result)
-    const conditionCount = result.conditions.length
+    const extras = [
+      result.conditions.length > 0 && `${result.conditions.length} 項疾病`,
+      result.visits?.length && `${result.visits.length} 筆就醫紀錄`,
+    ].filter(Boolean)
     setStatus(
       `已匯入 ${result.entries.length} 筆紀錄` +
-        (conditionCount > 0 ? `與 ${conditionCount} 項疾病` : ''),
+        (extras.length > 0 ? `與 ${extras.join('、')}` : ''),
     )
   }
 
@@ -97,6 +101,7 @@ export function DataTools() {
     const text = buildAnalysisPrompt(entries, {
       conditions: await listConditions(),
       medications: await listMedications(),
+      visits: await listVisits(),
       profile: await getProfile(),
       history,
     })

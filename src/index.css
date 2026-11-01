@@ -47,6 +47,16 @@ textarea.mantine-Textarea-input {
   align-items: end;
 }
 
+/* 就醫紀錄的一項（例如「醫囑：…」）：標籤一欄、內容一欄，多行的內容保留換行並對齊內容那欄 */
+.visit-detail {
+  display: grid;
+  grid-template-columns: auto 1fr;
+}
+
+.visit-detail > :last-child {
+  white-space: pre-line;
+}
+
 /* 表單底部固定的儲存列：抵銷卡片的內距，讓它貼齊卡片左右與下緣 */
 .save-bar {
   position: sticky;

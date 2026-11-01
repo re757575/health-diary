@@ -9,6 +9,7 @@ import {
   listEntries,
   listFoods,
   listMedications,
+  listVisits,
 } from '@/data/repository'
 import { backupStatus } from '@/domain/backup'
 import { emptyForm, entryToForm, shiftDate, toDateString } from '@/domain/form'
@@ -17,6 +18,7 @@ import { MEAL_TYPES } from '@/domain/entry'
 import { sortFoodsByUsage } from '@/domain/food'
 import { activeMedications, collectAsNeededNames } from '@/domain/medication'
 import { collectTagNames } from '@/domain/tag'
+import { FOLLOW_UP_REMINDER_DAYS, upcomingFollowUps } from '@/domain/visit'
 import { weightOn } from '@/domain/weight'
 import { AboutSection } from './AboutSection'
 import { BackupNotice } from './BackupNotice'
@@ -25,6 +27,7 @@ import { DataTools } from './DataTools'
 import { findIncompleteDays } from '@/domain/quality'
 import { EntryForm } from './EntryForm'
 import { HistoryList } from './HistoryList'
+import { FollowUpNotice } from './FollowUpNotice'
 import { Foods } from './Foods'
 import { Medications } from './Medications'
 import { MissingNotice } from './MissingNotice'
@@ -33,9 +36,10 @@ import { Report } from './Report'
 import { Section } from './Section'
 import { TrendCharts } from './TrendCharts'
 import { UpdateNotice } from './UpdateNotice'
+import { Visits } from './Visits'
 import { useAppUpdate } from './useAppUpdate'
 
-type TabValue = 'today' | 'trends' | 'report' | 'settings'
+type TabValue = 'today' | 'trends' | 'visits' | 'report' | 'settings'
 
 export default function App() {
   const [tab, setTab] = useState<TabValue>('today')
@@ -50,6 +54,7 @@ export default function App() {
   const asNeededNames = useMemo(() => collectAsNeededNames(history ?? []), [history])
   const medications = useLiveQuery(listMedications, [])
   const foodList = useLiveQuery(listFoods, [])
+  const visits = useLiveQuery(listVisits, [])
   // 每一餐依那一餐吃過的次數排序，早餐常吃的不一定是晚餐常吃的
   const foodsByMeal = useMemo(
     () =>
@@ -133,6 +138,11 @@ export default function App() {
     lastBackup &&
     backupStatus(lastBackup.at, history[history.length - 1]?.date, new Date())
 
+  // 回診前幾天在「今天」提醒；以 App 開著的今天為準，不是正在編輯的那天
+  const followUps = upcomingFollowUps(visits ?? [], today).filter(
+    (f) => f.daysLeft <= FOLLOW_UP_REMINDER_DAYS,
+  )
+
   // 歷史紀錄在「趨勢」，編輯表單在「今天」，所以選一天來編輯時要切過去
   function editDate(next: string) {
     if (changeDate(next)) changeTab('today')
@@ -155,12 +165,16 @@ export default function App() {
         <Tabs.List grow className="app-tabs">
           <Tabs.Tab value="today">今天</Tabs.Tab>
           <Tabs.Tab value="trends">趨勢</Tabs.Tab>
+          <Tabs.Tab value="visits">就醫</Tabs.Tab>
           <Tabs.Tab value="report">報告</Tabs.Tab>
           <Tabs.Tab value="settings">設定</Tabs.Tab>
         </Tabs.List>
 
         <Tabs.Panel value="today" pt="md">
           <Stack gap="md">
+            {followUps.length > 0 && (
+              <FollowUpNotice followUps={followUps} onOpen={() => changeTab('visits')} />
+            )}
             {backup?.due && <BackupNotice daysSince={backup.daysSince} />}
             {history && (
               <MissingNotice
@@ -198,8 +212,14 @@ export default function App() {
           </Stack>
         </Tabs.Panel>
 
+        <Tabs.Panel value="visits" pt="md">
+          <Visits />
+        </Tabs.Panel>
+
         <Tabs.Panel value="report" pt="md">
-          {history && <Report entries={history} medications={medications ?? []} />}
+          {history && (
+            <Report entries={history} medications={medications ?? []} visits={visits ?? []} />
+          )}
         </Tabs.Panel>
 
         <Tabs.Panel value="settings" pt="md">

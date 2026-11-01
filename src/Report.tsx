@@ -5,7 +5,7 @@ import { getProfile, listConditions } from '@/data/repository'
 import { CONDITION_STATUS_LABELS } from '@/domain/condition'
 import { buildDaily } from '@/domain/daily'
 import type { Entry } from '@/domain/entry'
-import { shiftDate, toDateString } from '@/domain/form'
+import { shiftDate, toDateString, withWeekday } from '@/domain/form'
 import { formatPeriod, medicationsDuring, type Medication } from '@/domain/medication'
 import { buildMedicationTrend } from '@/domain/medication-trend'
 import { SEX_LABELS, ageOn } from '@/domain/profile'
@@ -18,6 +18,7 @@ import {
   type ReportRange,
 } from '@/domain/report'
 import { buildSymptomTrend, buildTrends, suspectSleepNote } from '@/domain/trend'
+import { describeVisit, visitDetails, visitsDuring, type Visit } from '@/domain/visit'
 import { Section } from './Section'
 import { SymptomChart, TrendChart } from './TrendCharts'
 
@@ -25,10 +26,10 @@ interface Props {
   /** 全部紀錄（體重沿用要看範圍之前的） */
   entries: Entry[]
   medications: Medication[]
+  visits: Visit[]
 }
 
 const QUICK_RANGES = [7, 30, 90]
-const WEEKDAYS = '日一二三四五六'
 
 /** YYYY-MM-DD → 本地時間的 Date（趨勢圖以這天為區間的最後一天） */
 function toLocalDate(date: string): Date {
@@ -39,9 +40,6 @@ function toLocalDate(date: string): Date {
 /** 10/28 */
 const shortDate = (date: string) => date.slice(5).replace('-', '/')
 
-/** 2026-10-28（三） */
-const withWeekday = (date: string) => `${date}（${WEEKDAYS[toLocalDate(date).getDay()]}）`
-
 const formatChange = (change: number) =>
   change === 0 ? '±0' : change > 0 ? `+${change}` : `−${-change}`
 
@@ -49,7 +47,7 @@ const formatChange = (change: number) =>
  * 就醫報告：選一段期間，整理給醫生看的重點（不是每天的完整紀錄）。
  * 可以直接給醫生看，或列印、存成 PDF；列印時只印報告本身
  */
-export function Report({ entries, medications }: Props) {
+export function Report({ entries, medications, visits }: Props) {
   const today = toDateString(new Date())
   const [startDate, setStartDate] = useState(() => shiftDate(today, -29))
   const [endDate, setEndDate] = useState(today)
@@ -67,7 +65,7 @@ export function Report({ entries, medications }: Props) {
         <Section title="就醫報告">
           <Stack gap="sm">
             <Text size="sm" c="dimmed">
-              選一段期間，整理給醫生看的重點：基本資料、用藥、期間摘要、趨勢圖與有狀況的日子。可以直接給醫生看，或列印、存成
+              選一段期間，整理給醫生看的重點：基本資料、用藥、就醫紀錄、期間摘要、趨勢圖與有狀況的日子。可以直接給醫生看，或列印、存成
               PDF。
             </Text>
             <Group gap="xs" role="group" aria-label="快速選擇期間" grow>
@@ -110,7 +108,7 @@ export function Report({ entries, medications }: Props) {
       </div>
 
       {!('error' in range) && (
-        <ReportContent entries={entries} medications={medications} range={range} />
+        <ReportContent entries={entries} medications={medications} visits={visits} range={range} />
       )}
     </Stack>
   )
@@ -119,6 +117,7 @@ export function Report({ entries, medications }: Props) {
 function ReportContent({
   entries,
   medications,
+  visits,
   range,
 }: Props & {
   range: ReportRange
@@ -148,6 +147,7 @@ function ReportContent({
     p?.heightCm !== undefined && `身高 ${p.heightCm} cm`,
   ].filter(Boolean)
   const periodMeds = medicationsDuring(medications, range.startDate, range.endDate)
+  const periodVisits = visitsDuring(visits, range.startDate, range.endDate)
 
   const summaryRows = [
     summary.weight && {
@@ -221,6 +221,28 @@ function ReportContent({
                 </Text>
               ))}
             </Stack>
+          </Section>
+        )}
+
+        {periodVisits.length > 0 && (
+          <Section title="就醫紀錄">
+            <dl className="report-days">
+              {periodVisits.map((v) => (
+                <Fragment key={v.id}>
+                  <dt>
+                    {withWeekday(v.date)} {describeVisit(v)}
+                  </dt>
+                  <dd>
+                    {visitDetails(v).map((d) => (
+                      <div key={d.label} className="visit-detail">
+                        <span>{d.label}：</span>
+                        <span>{d.value}</span>
+                      </div>
+                    ))}
+                  </dd>
+                </Fragment>
+              ))}
+            </dl>
           </Section>
         )}
 

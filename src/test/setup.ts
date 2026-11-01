@@ -22,6 +22,13 @@ window.matchMedia ??= (query: string) =>
     onchange: null,
   }) as MediaQueryList
 
+// Textarea 的 autosize 會監聽字型載入完成，重新計算高度
+if (!('fonts' in document)) {
+  Object.defineProperty(document, 'fonts', {
+    value: { addEventListener: () => {}, removeEventListener: () => {} },
+  })
+}
+
 globalThis.ResizeObserver ??= class {
   observe() {}
   unobserve() {}

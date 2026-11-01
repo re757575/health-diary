@@ -4,6 +4,7 @@ import type { Entry } from '@/domain/entry'
 import { convertLegacyMeal } from '@/domain/legacy-meal'
 import type { Medication } from '@/domain/medication'
 import type { Profile } from '@/domain/profile'
+import type { Visit } from '@/domain/visit'
 
 /** 基本資料整個 App 只有一份，固定用這個 id 存 */
 export const PROFILE_ID = 'me'
@@ -29,6 +30,7 @@ class HealthDiaryDb extends Dexie {
   meta!: EntityTable<Meta, 'key'>
   medications!: EntityTable<Medication, 'id'>
   foods!: EntityTable<StoredFood, 'name'>
+  visits!: EntityTable<Visit, 'id'>
 
   constructor() {
     super('health-diary')
@@ -71,6 +73,16 @@ class HealthDiaryDb extends Dexie {
             entry.meals = entry.meals.map(convertLegacyMeal)
           }),
       )
+    // v8：新增就醫紀錄（visits）資料表。只新增資料表，既有資料不受影響
+    this.version(8).stores({
+      entries: 'date',
+      conditions: 'id',
+      profile: 'id',
+      meta: 'key',
+      medications: 'id',
+      foods: 'name',
+      visits: 'id',
+    })
   }
 }
 

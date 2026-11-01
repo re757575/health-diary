@@ -54,6 +54,14 @@ export function shiftDate(date: string, days: number): string {
   return toDateString(new Date(year!, month! - 1, day! + days))
 }
 
+const WEEKDAYS = '日一二三四五六'
+
+/** 2026-10-28（三） */
+export function withWeekday(date: string): string {
+  const [year, month, day] = date.split('-').map(Number)
+  return `${date}（${WEEKDAYS[new Date(year!, month! - 1, day!).getDay()]}）`
+}
+
 /** 本地時間的 HH:mm，給時間欄位的「現在」按鈕用 */
 export function toTimeString(date: Date): string {
   const pad = (n: number) => String(n).padStart(2, '0')

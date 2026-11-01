@@ -9,6 +9,7 @@ import {
   addFoods,
   deleteFood,
   deleteMedication,
+  deleteVisit,
   getEntry,
   getLastBackupAt,
   getProfile,
@@ -17,11 +18,13 @@ import {
   listEntries,
   listFoods,
   listMedications,
+  listVisits,
   recordBackup,
   saveCondition,
   saveEntry,
   saveMedication,
   saveProfile,
+  saveVisit,
 } from './repository'
 
 const entry = (date: string, extra: Partial<Entry> = {}): Entry => ({
@@ -46,6 +49,7 @@ beforeEach(async () => {
     db.meta.clear(),
     db.medications.clear(),
     db.foods.clear(),
+    db.visits.clear(),
   ])
 })
 
@@ -145,9 +149,9 @@ describe('症狀項目與資料庫升版', () => {
     expect((await getEntry('2026-10-28'))?.symptomItems).toEqual(symptomItems)
   })
 
-  it('資料庫版本是 7（v6 新增固定用藥，v7 新增常吃的食物清單）', () => {
+  it('資料庫版本是 8（v7 新增常吃的食物清單，v8 新增就醫紀錄）', () => {
     // Dexie 內部版本是宣告的 10 倍；verno 回傳宣告的版本
-    expect(db.verno).toBe(7)
+    expect(db.verno).toBe(8)
   })
 
   it('v2 時代存的舊資料升版後仍在，沒有症狀項目', async () => {
@@ -209,6 +213,33 @@ describe('固定用藥', () => {
       medications: [{ id: 'c', name: '鈣片', startDate: '2026-11-01' }],
     })
     expect((await listMedications()).map((m) => m.id)).toEqual(['a', 'c'])
+  })
+})
+
+describe('就醫紀錄', () => {
+  it('由新到舊列出；可以更新與刪除；匯入備份時同 id 覆蓋、其餘保留', async () => {
+    await saveVisit({ id: 'a', date: '2026-10-01', facility: '安心診所' })
+    await saveVisit({ id: 'b', date: '2026-10-20', facility: '台大醫院' })
+    expect((await listVisits()).map((v) => v.id)).toEqual(['b', 'a'])
+
+    await saveVisit({ id: 'a', date: '2026-10-01', facility: '安心診所', diagnosis: '感冒' })
+    await deleteVisit('b')
+    expect(await listVisits()).toEqual([
+      { id: 'a', date: '2026-10-01', facility: '安心診所', diagnosis: '感冒' },
+    ])
+
+    await importBackup({
+      entries: [],
+      conditions: [],
+      visits: [
+        { id: 'a', date: '2026-10-01', facility: '安心診所', diagnosis: '過敏性鼻炎' },
+        { id: 'c', date: '2026-10-30', facility: '台大醫院' },
+      ],
+    })
+    expect((await listVisits()).map((v) => [v.id, v.diagnosis])).toEqual([
+      ['c', undefined],
+      ['a', '過敏性鼻炎'],
+    ])
   })
 })
 
