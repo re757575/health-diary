@@ -2,6 +2,12 @@
 
 本檔案由 [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) 依照 [Conventional Commits](https://www.conventionalcommits.org/) 規範的 commit 訊息自動產生，請勿手動編輯內容，執行 `npm run release` 即可更新。
 
+## [0.1.13](https://github.com/re757575/health-diary/compare/v0.1.12...v0.1.13) (2026-11-01)
+
+### Features
+
+* **meal:** 餐點改成一項項的食物與份量，可匯入常吃的食物清單快速點選 ([63af001](https://github.com/re757575/health-diary/commit/63af0019bb264ceaf9064ed2db743d19e8f1e6df))
+* **trend:** 趨勢頁加上固定用藥的服藥天數與有吃、沒吃的對照 ([59557f0](https://github.com/re757575/health-diary/commit/59557f0ccd87112f446263bb60fdd781edec0348))
 ## [0.1.12](https://github.com/re757575/health-diary/compare/v0.1.11...v0.1.12) (2026-11-01)
 
 ### Features
