@@ -6,6 +6,7 @@ import { filterFoods, formatFoodList, splitFoodList } from '@/domain/food'
 import { toDateString } from '@/domain/form'
 import { shareOrDownload } from './shareFile'
 import { Section } from './Section'
+import { ShowMoreButton } from './ShowMoreButton'
 import { Status } from './Status'
 import { useStatus } from './useStatus'
 
@@ -15,6 +16,8 @@ export function Foods() {
   const [text, setText] = useState('')
   // 清單變長之後，用來找出要移除的項目
   const [search, setSearch] = useState('')
+  // 清單會越來越長（存檔時也會自動加入），預設收起來；搜尋時直接列出符合的
+  const [showList, setShowList] = useState(false)
   const [status, setStatus, tryWrite] = useStatus()
   const resetFileRef = useRef<() => void>(null)
 
@@ -111,25 +114,34 @@ export function Foods() {
             <Text size="sm" fw={500} mb={4}>
               {search.trim()
                 ? `符合 ${filterFoods(foods, search).length} 項（共 ${foods.length} 項，點一下移除）`
-                : `目前 ${foods.length} 項（點一下移除）`}
+                : `目前 ${foods.length} 項` + (showList ? '（點一下移除）' : '')}
             </Text>
-            <Group gap="xs" role="group" aria-label="常吃的食物清單">
-              {filterFoods(foods, search).map((name) => (
-                <Button
-                  key={name}
-                  type="button"
-                  size="compact-md"
-                  variant="default"
-                  aria-label={`移除 ${name}`}
-                  onClick={() => handleDelete(name)}
-                >
-                  {name}
-                  <span aria-hidden="true" style={{ marginLeft: '0.375em', opacity: 0.6 }}>
-                    ×
-                  </span>
-                </Button>
-              ))}
-            </Group>
+            {!search.trim() && (
+              <ShowMoreButton
+                expanded={showList}
+                onToggle={() => setShowList(!showList)}
+                moreLabel="顯示清單"
+              />
+            )}
+            {(search.trim() !== '' || showList) && (
+              <Group gap="xs" role="group" aria-label="常吃的食物清單" mt="xs">
+                {filterFoods(foods, search).map((name) => (
+                  <Button
+                    key={name}
+                    type="button"
+                    size="compact-md"
+                    variant="default"
+                    aria-label={`移除 ${name}`}
+                    onClick={() => handleDelete(name)}
+                  >
+                    {name}
+                    <span aria-hidden="true" style={{ marginLeft: '0.375em', opacity: 0.6 }}>
+                      ×
+                    </span>
+                  </Button>
+                ))}
+              </Group>
+            )}
           </div>
         )}
       </Stack>

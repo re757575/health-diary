@@ -913,7 +913,9 @@ describe('藥物與保健食品', () => {
     await user.click(await within(section).findByRole('button', { name: '編輯 魚油' }))
     await user.type(within(section).getByLabelText('最後一天（停吃時填）'), '2026-02-01')
     await user.click(within(section).getByRole('button', { name: '更新藥物' }))
-    expect(await within(section).findByText(/2026-01-01～2026-02-01 · 已停吃/)).toBeInTheDocument()
+    // 停吃的藥預設收在「已停吃」裡
+    await user.click(await within(section).findByRole('button', { name: '已停吃（1）' }))
+    expect(within(section).getByText(/2026-01-01～2026-02-01 · 已停吃/)).toBeInTheDocument()
 
     await openTab(user, '今天')
     await waitFor(() =>
@@ -969,7 +971,9 @@ describe('常吃的食物', () => {
     await user.type(within(section).getByLabelText('貼上食物清單'), '燕麥、香蕉\n地瓜，香蕉')
     await user.click(within(section).getByRole('button', { name: '匯入清單' }))
     expect(await within(section).findByText('已加入 3 項（1 項重複，已略過）')).toBeInTheDocument()
-    expect(within(section).getByText('目前 3 項（點一下移除）')).toBeInTheDocument()
+    // 清單預設收起來，只顯示項數
+    expect(within(section).getByText('目前 3 項')).toBeInTheDocument()
+    expect(within(section).queryByRole('group', { name: '常吃的食物清單' })).not.toBeInTheDocument()
 
     await user.type(within(section).getByLabelText('貼上食物清單'), '香蕉、蘋果')
     await user.click(within(section).getByRole('button', { name: '匯入清單' }))
@@ -1225,6 +1229,28 @@ describe('就醫紀錄', () => {
     expect(
       await within(form).findByText(`${shiftDate(today, -1)} 的每日紀錄沒有記下症狀`),
     ).toBeInTheDocument()
+  })
+
+  it('就醫紀錄先列最近 5 次，其餘收進「顯示全部」', async () => {
+    const user = userEvent.setup()
+    await db.visits.bulkPut(
+      Array.from({ length: 7 }, (_, i) => ({
+        id: `v${i}`,
+        date: shiftDate(today, -i * 10),
+        facility: `診所${i}`,
+      })),
+    )
+    render(<App />)
+    await openTab(user, '就醫')
+    const list = await screen.findByRole('region', { name: '就醫紀錄' })
+
+    await waitFor(() => expect(within(list).getAllByRole('listitem')).toHaveLength(5))
+    expect(within(list).getByText(/診所0/)).toBeInTheDocument()
+    expect(within(list).queryByText(/診所6/)).not.toBeInTheDocument()
+
+    await user.click(within(list).getByRole('button', { name: '顯示全部（還有 2 次）' }))
+    expect(within(list).getAllByRole('listitem')).toHaveLength(7)
+    expect(within(list).getByText(/診所6/)).toBeInTheDocument()
   })
 
   it('回診前 3 天在「今天」提醒，點了切到「就醫」；還早的不提醒', async () => {

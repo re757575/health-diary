@@ -3,6 +3,7 @@ import { Fragment, useState } from 'react'
 import { deleteEntry, saveEntry } from '@/data/repository'
 import { sleepHours, type Entry } from '@/domain/entry'
 import { Section } from './Section'
+import { ShowMoreButton } from './ShowMoreButton'
 import { Status } from './Status'
 import { useStatus } from './useStatus'
 
@@ -14,11 +15,17 @@ interface Props {
   onEdit: (date: string) => void
 }
 
+/** 預設只列最近幾天；紀錄每天增加，全部列出會非常長 */
+const RECENT_COUNT = 7
+
 /** 「趨勢」分頁的歷史紀錄：每天一列，可以編輯或刪除，刪除後可復原 */
 export function HistoryList({ entries, editingDate, onEdit }: Props) {
   const [status, setStatus, tryWrite] = useStatus()
   /** 剛刪除的紀錄，讓使用者能復原；做了別的操作就清掉 */
   const [deleted, setDeleted] = useState<Entry | null>(null)
+  const [expanded, setExpanded] = useState(false)
+  const shown = expanded ? entries : entries.slice(0, RECENT_COUNT)
+  const hiddenCount = entries.length - RECENT_COUNT
 
   async function handleDelete(entry: Entry) {
     await tryWrite(async () => {
@@ -47,7 +54,7 @@ export function HistoryList({ entries, editingDate, onEdit }: Props) {
     <Section title="歷史紀錄">
       {entries.length === 0 && <Text>還沒有紀錄。</Text>}
       <Stack component="ul" gap={0} p={0} m={0} style={{ listStyle: 'none' }}>
-        {entries.map((entry, i) => {
+        {shown.map((entry, i) => {
           const hours = sleepHours(entry.sleep)
           return (
             <Fragment key={entry.date}>
@@ -98,6 +105,13 @@ export function HistoryList({ entries, editingDate, onEdit }: Props) {
           )
         })}
       </Stack>
+      {hiddenCount > 0 && (
+        <ShowMoreButton
+          expanded={expanded}
+          onToggle={() => setExpanded(!expanded)}
+          moreLabel={`顯示全部（還有 ${hiddenCount} 天）`}
+        />
+      )}
       <Group justify="space-between" wrap="nowrap">
         <Status status={status} />
         {deleted && (

@@ -26,6 +26,7 @@ import type { Medication } from '@/domain/medication'
 import { buildMedicationTrend, type MedicationTrendItem } from '@/domain/medication-trend'
 import type { DayWeight } from '@/domain/weight'
 import { Section } from './Section'
+import { ShowMoreButton } from './ShowMoreButton'
 
 interface Props {
   entries: Entry[]
@@ -36,6 +37,9 @@ interface Props {
 }
 
 /** 可以切換的區間；label 也用在標題與說明（「最近 30 天…」） */
+/** 趨勢頁先列最常出現的幾種症狀；症狀種類會越記越多 */
+const SYMPTOM_LIMIT = 6
+
 const RANGES = [
   { days: 30, label: '30 天' },
   { days: 90, label: '90 天' },
@@ -491,10 +495,22 @@ function MedicationChart({
 
 /**
  * @param periodText 說明文字開頭的期間，例如「最近 30 天」或「這段期間」
+ * @param limit 先列幾種症狀（已依天數由多到少），其餘收起來；沒給就全部列出
  */
-export function SymptomChart({ trend, periodText }: { trend: SymptomTrend; periodText: string }) {
+export function SymptomChart({
+  trend,
+  periodText,
+  limit,
+}: {
+  trend: SymptomTrend
+  periodText: string
+  limit?: number
+}) {
   const headingId = useId()
+  const [expanded, setExpanded] = useState(false)
   const { recordedDays, textOnlyDays, items } = trend
+  const shown = limit === undefined || expanded ? items : items.slice(0, limit)
+  const hiddenCount = limit === undefined ? 0 : items.length - limit
 
   return (
     <figure className="trend series-symptom" aria-labelledby={headingId}>
@@ -507,7 +523,7 @@ export function SymptomChart({ trend, periodText }: { trend: SymptomTrend; perio
       ) : (
         <>
           <ul className="symptom-bars">
-            {items.map((item) => (
+            {shown.map((item) => (
               <li key={item.name}>
                 <span className="symptom-name">{item.name}</span>
                 {/* 長條只是把右邊的文字畫出來，不重複給讀屏軟體 */}
@@ -528,6 +544,13 @@ export function SymptomChart({ trend, periodText }: { trend: SymptomTrend; perio
               </li>
             ))}
           </ul>
+          {hiddenCount > 0 && (
+            <ShowMoreButton
+              expanded={expanded}
+              onToggle={() => setExpanded(!expanded)}
+              moreLabel={`還有 ${hiddenCount} 種症狀`}
+            />
+          )}
           <p className="trend-note">長條顏色由淺到深是輕、中、重</p>
         </>
       )}
@@ -590,7 +613,7 @@ export function TrendCharts({ entries, today, medications = [] }: Props) {
       />
       <DailyChart daily={daily} periodText={periodText} />
       <MedicationChart items={medicationTrend} periodText={periodText} />
-      <SymptomChart trend={symptoms} periodText={periodText} />
+      <SymptomChart trend={symptoms} periodText={periodText} limit={SYMPTOM_LIMIT} />
     </Section>
   )
 }

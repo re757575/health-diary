@@ -18,8 +18,12 @@ import {
   type VisitFormValues,
 } from '@/domain/visit'
 import { Section } from './Section'
+import { ShowMoreButton } from './ShowMoreButton'
 import { Status } from './Status'
 import { useStatus } from './useStatus'
+
+/** 就醫紀錄先列最近幾次（由新到舊）；每筆都有不少細節，全部列出會很長 */
+const RECENT_VISITS = 5
 
 /** 文字欄位，有過去填過的值可以選（原生 datalist，手機上會出現在鍵盤上方） */
 function SuggestInput({
@@ -76,6 +80,7 @@ export function Visits() {
   const [listStatus, setListStatus, tryListWrite] = useStatus()
   /** 剛刪除的紀錄，讓使用者能復原；做了別的操作就清掉 */
   const [deleted, setDeleted] = useState<Visit | null>(null)
+  const [showAll, setShowAll] = useState(false)
   const formRef = useRef<HTMLFormElement>(null)
 
   const all = visits ?? []
@@ -297,7 +302,7 @@ export function Visits() {
         )}
         {visits?.length === 0 && <Text>還沒有就醫紀錄。</Text>}
         <Stack component="ul" gap={0} p={0} m={0} style={{ listStyle: 'none' }}>
-          {all.map((v, i) => {
+          {(showAll ? all : all.slice(0, RECENT_VISITS)).map((v, i) => {
             const name = `${v.date} ${v.facility}`
             return (
               <Fragment key={v.id}>
@@ -337,6 +342,13 @@ export function Visits() {
             )
           })}
         </Stack>
+        {all.length > RECENT_VISITS && (
+          <ShowMoreButton
+            expanded={showAll}
+            onToggle={() => setShowAll(!showAll)}
+            moreLabel={`顯示全部（還有 ${all.length - RECENT_VISITS} 次）`}
+          />
+        )}
       </Section>
     </Stack>
   )

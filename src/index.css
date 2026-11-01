@@ -322,6 +322,11 @@ textarea.mantine-Textarea-input {
   font-size: var(--mantine-font-size-sm);
 }
 
+/* 報告裡畫面上先收起來的項目（列印時會顯示，見下方 @media print） */
+.report-days .screen-hidden {
+  display: none;
+}
+
 /* 列印（或存成 PDF）時只印報告：分頁列、標題、按鈕與其他提示都藏起來；
    深色模式也改用淺色，瀏覽器通常不印背景色，淺色字會印得幾乎看不見 */
 @media print {
@@ -349,6 +354,11 @@ textarea.mantine-Textarea-input {
   .report tr,
   .report-days dd {
     break-inside: avoid;
+  }
+
+  /* 畫面上收起來的較早日子，紙本要印出來 */
+  .report-days .screen-hidden {
+    display: block;
   }
 
   /* 資料表在紙上不能展開，不印 */

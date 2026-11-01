@@ -20,6 +20,7 @@ import {
 import { buildSymptomTrend, buildTrends, suspectSleepNote } from '@/domain/trend'
 import { describeVisit, visitDetails, visitsDuring, type Visit } from '@/domain/visit'
 import { Section } from './Section'
+import { ShowMoreButton } from './ShowMoreButton'
 import { SymptomChart, TrendChart } from './TrendCharts'
 
 interface Props {
@@ -30,6 +31,8 @@ interface Props {
 }
 
 const QUICK_RANGES = [7, 30, 90]
+/** 「有狀況的日子」在畫面上先列最近幾天，期間選長時才不會一路滑不完 */
+const RECENT_DAYS = 10
 
 /** YYYY-MM-DD → 本地時間的 Date（趨勢圖以這天為區間的最後一天） */
 function toLocalDate(date: string): Date {
@@ -123,6 +126,7 @@ function ReportContent({
   range: ReportRange
 }) {
   const conditions = useLiveQuery(listConditions, [])
+  const [showOlder, setShowOlder] = useState(false)
   const profile = useLiveQuery(async () => ({ value: await getProfile() }), [])
   const end = toLocalDate(range.endDate)
   const inRange = entriesInRange(entries, range)
@@ -137,6 +141,7 @@ function ReportContent({
   )
   const asNeeded = asNeededDays(inRange)
   const days = notableDays(inRange, new Map(medications.map((m) => [m.id, m.name])))
+  const olderCount = days.length - RECENT_DAYS
   // 已痊癒的疾病對這次看診多半不重要，不列
   const ongoing = (conditions ?? []).filter((c) => c.status !== 'resolved')
   const p = profile?.value
@@ -295,27 +300,42 @@ function ReportContent({
           {days.length === 0 ? (
             <Text>這段期間沒有症狀、臨時用藥或異常排便的紀錄。</Text>
           ) : (
-            <dl className="report-days">
-              {days.map((d) => (
-                <Fragment key={d.date}>
-                  <dt>{withWeekday(d.date)}</dt>
-                  <dd>
-                    {[
-                      d.symptoms.length > 0 && `症狀：${d.symptoms.join('、')}`,
-                      d.symptomNote && `補充：${d.symptomNote}`,
-                      d.asNeeded.length > 0 && `臨時用藥：${d.asNeeded.join('、')}`,
-                      d.missedMedications.length > 0 &&
-                        `固定用藥沒吃：${d.missedMedications.join('、')}`,
-                      d.abnormalBowel.length > 0 && `排便：${d.abnormalBowel.join('、')}`,
-                    ]
-                      .filter(Boolean)
-                      .map((line) => (
-                        <div key={line as string}>{line}</div>
-                      ))}
-                  </dd>
-                </Fragment>
-              ))}
-            </dl>
+            <>
+              {olderCount > 0 && (
+                <div className="no-print">
+                  <ShowMoreButton
+                    expanded={showOlder}
+                    onToggle={() => setShowOlder(!showOlder)}
+                    moreLabel={`顯示較早的 ${olderCount} 天`}
+                  />
+                </div>
+              )}
+              <dl className="report-days">
+                {days.map((d, i) => {
+                  // 較早的日子在畫面上先收起來，但列印時照樣印出（用 class 隱藏而不是不畫）
+                  const hidden = !showOlder && i < olderCount ? 'screen-hidden' : undefined
+                  return (
+                    <Fragment key={d.date}>
+                      <dt className={hidden}>{withWeekday(d.date)}</dt>
+                      <dd className={hidden}>
+                        {[
+                          d.symptoms.length > 0 && `症狀：${d.symptoms.join('、')}`,
+                          d.symptomNote && `補充：${d.symptomNote}`,
+                          d.asNeeded.length > 0 && `臨時用藥：${d.asNeeded.join('、')}`,
+                          d.missedMedications.length > 0 &&
+                            `固定用藥沒吃：${d.missedMedications.join('、')}`,
+                          d.abnormalBowel.length > 0 && `排便：${d.abnormalBowel.join('、')}`,
+                        ]
+                          .filter(Boolean)
+                          .map((line) => (
+                            <div key={line as string}>{line}</div>
+                          ))}
+                      </dd>
+                    </Fragment>
+                  )
+                })}
+              </dl>
+            </>
           )}
         </Section>
       </Stack>

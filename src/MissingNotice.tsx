@@ -1,6 +1,7 @@
 import { Button, Group, Paper, Stack, Text } from '@mantine/core'
 import { useState } from 'react'
 import type { IncompleteDay } from '@/domain/quality'
+import { ShowMoreButton } from './ShowMoreButton'
 
 interface Props {
   days: IncompleteDay[]
@@ -58,15 +59,11 @@ export function MissingNotice({ days, currentDate, onFill }: Props) {
         ))}
       </Stack>
       {hiddenCount > 0 && (
-        <Button
-          variant="subtle"
-          size="compact-sm"
-          mt={4}
-          aria-expanded={expanded}
-          onClick={() => setExpanded(!expanded)}
-        >
-          {expanded ? '收合' : `還有 ${hiddenCount} 天`}
-        </Button>
+        <ShowMoreButton
+          expanded={expanded}
+          onToggle={() => setExpanded(!expanded)}
+          moreLabel={`還有 ${hiddenCount} 天`}
+        />
       )}
     </Paper>
   )
