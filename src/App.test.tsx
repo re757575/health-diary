@@ -14,7 +14,7 @@ import App from './App'
 const appUpdate = vi.hoisted(() => ({ updateReady: false, applyUpdate: vi.fn() }))
 vi.mock('./useAppUpdate', () => ({ useAppUpdate: () => appUpdate }))
 
-const openTab = (user: UserEvent, name: '今天' | '趨勢' | '設定') =>
+const openTab = (user: UserEvent, name: '今天' | '趨勢' | '報告' | '設定') =>
   user.click(screen.getByRole('tab', { name }))
 
 beforeEach(async () => {
@@ -713,7 +713,9 @@ describe('趨勢圖', () => {
       await screen.findByRole('img', { name: '體重趨勢折線圖，共 1 筆紀錄' }),
     ).toBeInTheDocument()
     expect(screen.getByRole('img', { name: '睡眠時數趨勢折線圖，共 1 筆紀錄' })).toBeInTheDocument()
-    expect(screen.getByText(/最新 7\.5 小時/)).toBeInTheDocument()
+    // 「報告」分頁也有同樣的圖（隱藏著），只看趨勢分頁裡的
+    const trends = screen.getByRole('region', { name: '最近 30 天趨勢' })
+    expect(within(trends).getByText(/最新 7\.5 小時/)).toBeInTheDocument()
   })
 })
 
@@ -1032,6 +1034,94 @@ describe('常吃的食物', () => {
     expect(
       await within(section).findByText('沒有找到食物名稱，請一行一個，或用逗號、頓號分隔'),
     ).toBeInTheDocument()
+  })
+})
+
+describe('就醫報告', () => {
+  const today = toDateString(new Date())
+  const day = (n: number) => shiftDate(today, -n)
+
+  it('預設最近 30 天：基本資料、未痊癒的疾病、用藥、期間摘要、趨勢與有狀況的日子', async () => {
+    const user = userEvent.setup()
+    await db.profile.put({ id: 'me', sex: 'male', heightCm: 171 })
+    await db.conditions.bulkPut([
+      { id: 'a', name: '過敏性鼻炎', status: 'managed', since: '2004-10' },
+      { id: 'b', name: '扭傷', status: 'resolved' },
+    ])
+    await db.medications.put({ id: 'c', name: '維他命C', dose: '1000mg', startDate: day(60) })
+    await db.entries.bulkPut([
+      { date: day(40), meals: [], bowel: [], weightKg: 80 }, // 範圍外
+      {
+        date: day(5),
+        meals: [],
+        bowel: [{ bristol: 7 }],
+        weightKg: 70,
+        sleep: { bedtime: '23:00', wakeTime: '07:00' },
+        mood: 4,
+      },
+      {
+        date: day(2),
+        meals: [],
+        bowel: [{ bristol: 4 }],
+        weightKg: 69.5,
+        mood: 2,
+        symptomItems: [{ name: '頭痛', severity: 3 }],
+        asNeededMedications: ['普拿疼'],
+        missedMedications: ['c'],
+      },
+    ])
+    render(<App />)
+    await openTab(user, '報告')
+
+    const header = await screen.findByRole('region', { name: '健康紀錄報告' })
+    expect(header).toHaveTextContent(`${day(29)}～${today}（30 天，有紀錄 2 天）`)
+    expect(header).toHaveTextContent('男，身高 171 cm')
+    const conditions = screen.getByRole('region', { name: '已知疾病' })
+    expect(conditions).toHaveTextContent('過敏性鼻炎（穩定控制中，2004-10 起）')
+    expect(conditions).not.toHaveTextContent('扭傷')
+    const meds = screen.getByRole('region', { name: '用藥' })
+    expect(meds).toHaveTextContent(`維他命C（1000mg）：${day(60)} 起，服藥 29／30 天（沒吃 1 天）`)
+    expect(meds).toHaveTextContent('臨時用藥：普拿疼，1 天')
+
+    const rows = within(screen.getByRole('table', { name: '期間摘要' }))
+      .getAllByRole('row')
+      .map((r) => r.textContent)
+    expect(rows[0]).toMatch(/^體重70 → 69\.5 kg（−0\.5 kg，/)
+    expect(rows).toContain('睡眠平均 8 小時（1 晚），睡不到 6.5 小時 0 晚')
+    expect(rows).toContain('心情平均 3／5（2 天）')
+    expect(rows).toContain('排便平均每天 1 次；硬便 0 天、腹瀉 1 天（2 天有記錄）')
+
+    expect(screen.getByRole('img', { name: /^體重趨勢折線圖，共 2 筆紀錄/ })).toBeInTheDocument()
+    const days = screen.getByRole('region', { name: '有狀況的日子' })
+    expect(days).toHaveTextContent(`${day(5)}`)
+    expect(days).toHaveTextContent('排便：布里斯托 7 型')
+    expect(days).toHaveTextContent('症狀：頭痛（重）')
+    expect(days).toHaveTextContent('臨時用藥：普拿疼')
+    expect(days).toHaveTextContent('固定用藥沒吃：維他命C')
+  })
+
+  it('快速選擇期間；開始晚於結束時說明原因且不能列印；列印呼叫瀏覽器的列印', async () => {
+    const user = userEvent.setup()
+    const print = vi.fn()
+    window.print = print
+    render(<App />)
+    await openTab(user, '報告')
+
+    await user.click(await screen.findByRole('button', { name: '最近 7 天' }))
+    expect(screen.getByLabelText('開始')).toHaveValue(day(6))
+    expect(screen.getByRole('region', { name: '健康紀錄報告' })).toHaveTextContent(
+      '（7 天，有紀錄 0 天）',
+    )
+    expect(screen.getByText('這段期間沒有可以摘要的紀錄。')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: '列印／存成 PDF' }))
+    expect(print).toHaveBeenCalled()
+
+    await user.clear(screen.getByLabelText('開始'))
+    await user.type(screen.getByLabelText('開始'), shiftDate(today, 1))
+    expect(screen.getByRole('alert')).toHaveTextContent('開始日期不能晚於結束日期')
+    expect(screen.getByRole('button', { name: '列印／存成 PDF' })).toBeDisabled()
+    expect(screen.queryByRole('region', { name: '健康紀錄報告' })).not.toBeInTheDocument()
   })
 })
 

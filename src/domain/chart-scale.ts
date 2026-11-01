@@ -102,10 +102,10 @@ export function buildLineChart({
 
 /**
  * 日期軸刻度落在第幾天：從最後一天往回數，讓最右邊永遠是「今天」。
- * 間距隨區間變長：30 天每 7 天、90 天每 15 天、1 年約每兩個月，刻度都維持 5～7 個
+ * 間距隨區間變長：一週每天、兩週隔天、30 天每 7 天、90 天每 15 天、1 年約每兩個月，刻度不超過 8 個
  */
 export function tickDayIndexes(days: number): number[] {
-  const step = days <= 31 ? 7 : days <= 92 ? 15 : 61
+  const step = days <= 8 ? 1 : days <= 15 ? 2 : days <= 31 ? 7 : days <= 92 ? 15 : 61
   return Array.from(
     { length: Math.floor((days - 1) / step) + 1 },
     (_, i) => days - 1 - i * step,

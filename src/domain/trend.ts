@@ -147,3 +147,13 @@ export function buildSymptomTrend(entries: Entry[], today: Date, days = 30): Sym
   )
   return { recordedDays: inWindow.length, textOnlyDays, items }
 }
+
+/** 睡眠超過 12 小時而沒畫進圖的日子；請使用者回去改入睡或起床時間 */
+export function suspectSleepNote(dates: string[]): string | undefined {
+  if (dates.length === 0) return undefined
+  const shown = dates
+    .slice(-3)
+    .map((d) => d.slice(5).replace('-', '/'))
+    .join('、')
+  return `${dates.length} 天的睡眠時數超過 ${LONG_SLEEP_HOURS} 小時，可能是入睡或起床時間填錯，未列入圖表（${shown}${dates.length > 3 ? ' 等' : ''}）。請到「歷史紀錄」編輯修正。`
+}

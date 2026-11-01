@@ -156,6 +156,8 @@ describe('buildLineChart：沿用模式（體重沒量時維持上一次）', ()
 
 describe('tickDayIndexes', () => {
   it('最右邊永遠是最後一天，間距隨區間變長，刻度維持 5～7 個', () => {
+    expect(tickDayIndexes(7)).toEqual([0, 1, 2, 3, 4, 5, 6])
+    expect(tickDayIndexes(14)).toEqual([1, 3, 5, 7, 9, 11, 13])
     expect(tickDayIndexes(30)).toEqual([1, 8, 15, 22, 29])
     expect(tickDayIndexes(90)).toEqual([14, 29, 44, 59, 74, 89])
     expect(tickDayIndexes(365)).toEqual([59, 120, 181, 242, 303, 364])

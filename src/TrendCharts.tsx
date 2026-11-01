@@ -13,10 +13,11 @@ import {
   type DayGroup,
 } from '@/domain/daily'
 import type { Entry } from '@/domain/entry'
-import { LONG_SLEEP_HOURS, SEVERITY_LABELS, SYMPTOM_SEVERITIES } from '@/domain/entry'
+import { SEVERITY_LABELS, SYMPTOM_SEVERITIES } from '@/domain/entry'
 import {
   buildSymptomTrend,
   buildTrends,
+  suspectSleepNote,
   summarizeSeries,
   type SymptomTrend,
   type TrendPoint,
@@ -64,13 +65,6 @@ function formatChange(change: number, unit: string): string {
   return `${change > 0 ? '+' : '−'}${Math.abs(change)} ${unit}`
 }
 
-/** 睡眠超過 12 小時而沒畫進圖的日子；請使用者回去改入睡或起床時間 */
-function suspectSleepNote(dates: string[]): string | undefined {
-  if (dates.length === 0) return undefined
-  const shown = dates.slice(-3).map(shortDate).join('、')
-  return `${dates.length} 天的睡眠時數超過 ${LONG_SLEEP_HOURS} 小時，可能是入睡或起床時間填錯，未列入圖表（${shown}${dates.length > 3 ? ' 等' : ''}）。請到「歷史紀錄」編輯修正。`
-}
-
 interface ChartProps {
   title: string
   /** 資料表與圖的名稱，例如「體重」 */
@@ -94,7 +88,7 @@ interface ChartProps {
   carry?: { carriedIn?: DayWeight }
 }
 
-function TrendChart({
+export function TrendChart({
   title,
   subject,
   valueHeader,
@@ -263,7 +257,7 @@ function groupRow(label: string, group: DayGroup) {
   )
 }
 
-function DailyChart({ daily, period }: { daily: Daily; period: string }) {
+function DailyChart({ daily, periodText }: { daily: Daily; periodText: string }) {
   const headingId = useId()
   const { cells, startDate, days } = daily
   const hasData = cells.some(
@@ -274,7 +268,7 @@ function DailyChart({ daily, period }: { daily: Daily; period: string }) {
     return (
       <figure className="trend" aria-labelledby={headingId}>
         <h3 id={headingId}>睡眠、心情與症狀對照</h3>
-        <p>最近 {period}還沒有睡眠、心情或症狀的紀錄</p>
+        <p>{periodText}還沒有睡眠、心情或症狀的紀錄</p>
       </figure>
     )
   }
@@ -305,7 +299,7 @@ function DailyChart({ daily, period }: { daily: Daily; period: string }) {
 
       <svg
         role="img"
-        aria-label={`最近 ${period}睡眠、心情與症狀一覽，共 ${cells.length} 天有紀錄`}
+        aria-label={`${periodText}睡眠、心情與症狀一覽，共 ${cells.length} 天有紀錄`}
         viewBox={`0 0 ${STRIP.width} ${height}`}
       >
         {STRIP_ROWS.map((row, r) => (
@@ -434,14 +428,20 @@ function DailyChart({ daily, period }: { daily: Daily; period: string }) {
 }
 
 /** 固定用藥的服藥天數，以及有吃、沒吃的日子在心情與症狀上的對照；區間內沒有固定用藥就不顯示 */
-function MedicationChart({ items, period }: { items: MedicationTrendItem[]; period: string }) {
+function MedicationChart({
+  items,
+  periodText,
+}: {
+  items: MedicationTrendItem[]
+  periodText: string
+}) {
   const headingId = useId()
   if (items.length === 0) return null
 
   return (
     <figure className="trend series-mood" aria-labelledby={headingId}>
       <h3 id={headingId}>固定用藥</h3>
-      <p>最近 {period}的服藥天數；沒有標「沒吃」的日子都算有吃。</p>
+      <p>{periodText}的服藥天數；沒有標「沒吃」的日子都算有吃。</p>
       {items.map(({ medication, scheduledDays, missedDays, taken, missed }) => {
         const takenDays = scheduledDays - missedDays
         const comparable = taken.days >= MIN_COMPARE_DAYS && missed.days >= MIN_COMPARE_DAYS
@@ -489,7 +489,10 @@ function MedicationChart({ items, period }: { items: MedicationTrendItem[]; peri
   )
 }
 
-function SymptomChart({ trend, period }: { trend: SymptomTrend; period: string }) {
+/**
+ * @param periodText 說明文字開頭的期間，例如「最近 30 天」或「這段期間」
+ */
+export function SymptomChart({ trend, periodText }: { trend: SymptomTrend; periodText: string }) {
   const headingId = useId()
   const { recordedDays, textOnlyDays, items } = trend
 
@@ -497,10 +500,10 @@ function SymptomChart({ trend, period }: { trend: SymptomTrend; period: string }
     <figure className="trend series-symptom" aria-labelledby={headingId}>
       <h3 id={headingId}>症狀出現天數</h3>
       <p>
-        最近 {period}有 {recordedDays} 天有紀錄
+        {periodText}有 {recordedDays} 天有紀錄
       </p>
       {items.length === 0 ? (
-        <p>最近 {period}還沒有點選記錄的症狀</p>
+        <p>{periodText}還沒有點選記錄的症狀</p>
       ) : (
         <>
           <ul className="symptom-bars">
@@ -538,6 +541,7 @@ function SymptomChart({ trend, period }: { trend: SymptomTrend; period: string }
 export function TrendCharts({ entries, today, medications = [] }: Props) {
   const [range, setRange] = useState<Range>(RANGES[0])
   const { days, label: period } = range
+  const periodText = `最近 ${period}`
   const trends = buildTrends(entries, today, days)
   const symptoms = buildSymptomTrend(entries, today, days)
   const daily = buildDaily(entries, today, days)
@@ -565,7 +569,7 @@ export function TrendCharts({ entries, today, medications = [] }: Props) {
         subject="體重"
         valueHeader="體重"
         unit="kg"
-        emptyText={`最近 ${period}還沒有體重紀錄`}
+        emptyText={`${periodText}還沒有體重紀錄`}
         seriesClass="series-weight"
         points={trends.weight}
         startDate={trends.startDate}
@@ -577,16 +581,16 @@ export function TrendCharts({ entries, today, medications = [] }: Props) {
         subject="睡眠時數"
         valueHeader="睡眠時數"
         unit="小時"
-        emptyText={`最近 ${period}還沒有睡眠紀錄（需要填入睡與起床時間）`}
+        emptyText={`${periodText}還沒有睡眠紀錄（需要填入睡與起床時間）`}
         seriesClass="series-sleep"
         points={trends.sleepHours}
         startDate={trends.startDate}
         days={days}
         note={suspectSleepNote(trends.suspectSleepDates)}
       />
-      <DailyChart daily={daily} period={period} />
-      <MedicationChart items={medicationTrend} period={period} />
-      <SymptomChart trend={symptoms} period={period} />
+      <DailyChart daily={daily} periodText={periodText} />
+      <MedicationChart items={medicationTrend} periodText={periodText} />
+      <SymptomChart trend={symptoms} periodText={periodText} />
     </Section>
   )
 }

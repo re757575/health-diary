@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test'
 
-const openTab = (page: Page, name: '今天' | '趨勢' | '設定') =>
+const openTab = (page: Page, name: '今天' | '趨勢' | '報告' | '設定') =>
   page.getByRole('tab', { name }).click()
 
 /** 在某一餐輸入食物名稱並加入（預設 1 份） */
@@ -674,4 +674,32 @@ test('匯入舊版備份：整段文字的餐點自動拆成一項項的食物�
   await expect(page.getByLabel('白飯的單位')).toHaveValue('碗')
   await expect(foodRow(page, '午餐', '魯肉飯（小）')).toBeVisible()
   await expect(page.getByLabel('午餐備註')).toHaveValue('外食')
+})
+
+test('就醫報告：選期間後整理重點，列印時只印報告', async ({ page }) => {
+  await page.goto('./')
+  await page.getByLabel('體重（kg）').fill('70')
+  await page.getByLabel('入睡時間').fill('23:00')
+  await page.getByLabel('起床時間').fill('07:00')
+  await page.getByRole('group', { name: '症狀' }).getByRole('button', { name: '頭痛' }).click()
+  await page.getByRole('button', { name: '儲存', exact: true }).click()
+  await expect(page.getByText(/已儲存 \d{4}-\d{2}-\d{2} 的紀錄/)).toBeVisible()
+
+  await openTab(page, '報告')
+  await page.getByRole('button', { name: '最近 7 天' }).click()
+  await expect(page.getByRole('region', { name: '健康紀錄報告' })).toContainText(
+    '（7 天，有紀錄 1 天）',
+  )
+  await expect(page.getByRole('table', { name: '期間摘要' })).toContainText('平均 8 小時')
+  await expect(page.getByRole('region', { name: '有狀況的日子' })).toContainText('症狀：頭痛（輕）')
+
+  // 列印對話框無法自動測，只確認有呼叫，並用列印樣式檢查只剩報告
+  // （用字串是因為 e2e 的 tsconfig 沒有 DOM 型別）
+  await page.evaluate('window.printed = false; window.print = () => { window.printed = true }')
+  await page.getByRole('button', { name: '列印／存成 PDF' }).click()
+  expect(await page.evaluate('window.printed')).toBe(true)
+  await page.emulateMedia({ media: 'print' })
+  await expect(page.getByRole('tab', { name: '報告' })).toBeHidden()
+  await expect(page.getByRole('button', { name: '列印／存成 PDF' })).toBeHidden()
+  await expect(page.getByRole('region', { name: '期間摘要' })).toBeVisible()
 })

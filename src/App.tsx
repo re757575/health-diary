@@ -29,12 +29,13 @@ import { Foods } from './Foods'
 import { Medications } from './Medications'
 import { MissingNotice } from './MissingNotice'
 import { ProfileForm } from './ProfileForm'
+import { Report } from './Report'
 import { Section } from './Section'
 import { TrendCharts } from './TrendCharts'
 import { UpdateNotice } from './UpdateNotice'
 import { useAppUpdate } from './useAppUpdate'
 
-type TabValue = 'today' | 'trends' | 'settings'
+type TabValue = 'today' | 'trends' | 'report' | 'settings'
 
 export default function App() {
   const [tab, setTab] = useState<TabValue>('today')
@@ -139,12 +140,13 @@ export default function App() {
 
   return (
     <Container component="main" size="sm" py="md">
-      <Title order={1} size="h2" mb="sm">
+      {/* 列印就醫報告時，App 標題與更新提示都不印 */}
+      <Title order={1} size="h2" mb="sm" className="no-print">
         健康日記
       </Title>
 
       {updateReady && (
-        <Box mb="sm">
+        <Box mb="sm" className="no-print">
           <UpdateNotice dirty={dirty} onUpdate={applyUpdate} />
         </Box>
       )}
@@ -153,6 +155,7 @@ export default function App() {
         <Tabs.List grow className="app-tabs">
           <Tabs.Tab value="today">今天</Tabs.Tab>
           <Tabs.Tab value="trends">趨勢</Tabs.Tab>
+          <Tabs.Tab value="report">報告</Tabs.Tab>
           <Tabs.Tab value="settings">設定</Tabs.Tab>
         </Tabs.List>
 
@@ -193,6 +196,10 @@ export default function App() {
 
             {history && <HistoryList entries={history} editingDate={date} onEdit={editDate} />}
           </Stack>
+        </Tabs.Panel>
+
+        <Tabs.Panel value="report" pt="md">
+          {history && <Report entries={history} medications={medications ?? []} />}
         </Tabs.Panel>
 
         <Tabs.Panel value="settings" pt="md">
