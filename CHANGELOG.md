@@ -2,6 +2,11 @@
 
 本檔案由 [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) 依照 [Conventional Commits](https://www.conventionalcommits.org/) 規範的 commit 訊息自動產生，請勿手動編輯內容，執行 `npm run release` 即可更新。
 
+## [0.1.14](https://github.com/re757575/health-diary/compare/v0.1.13...v0.1.14) (2026-11-01)
+
+### Features
+
+* **meal:** 常吃的食物清單可以匯出，匯入時排除寫法稍有不同的重複 ([3518863](https://github.com/re757575/health-diary/commit/351886386a3da14ea6fa2fa11c678dc980bb7ac7))
 ## [0.1.13](https://github.com/re757575/health-diary/compare/v0.1.12...v0.1.13) (2026-11-01)
 
 ### Features
