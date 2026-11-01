@@ -1,6 +1,7 @@
 import type { BackupData } from '@/domain/backup'
 import type { Condition } from '@/domain/condition'
 import type { Entry } from '@/domain/entry'
+import { uniqueFoods } from '@/domain/food'
 import type { Medication } from '@/domain/medication'
 import type { Profile } from '@/domain/profile'
 import { PROFILE_ID, db, type StoredFood } from './db'
@@ -62,19 +63,20 @@ export async function listFoods(): Promise<string[]> {
 }
 
 /**
- * 加入食物；已經在清單裡的略過（不改變原本的順序）。回傳實際新增了幾項。
+ * 加入食物；已經在清單裡的略過（寫法稍有不同也算，不改變原本的順序）。回傳實際新增了幾項。
  * 同一批的 addedAt 依序遞增，之後列出時維持匯入的順序
  */
 export async function addFoods(names: string[], now: Date = new Date()): Promise<number> {
   return db.transaction('rw', db.foods, async () => {
     const stored = await db.foods.toArray()
-    const existing = new Set(stored.map((f) => f.name))
     // 接在清單最後：同一毫秒內連續加入時，不能排到前一批的前面
     const last = Math.max(0, ...stored.map((f) => Date.parse(f.addedAt)))
     const start = Math.max(now.getTime(), last + 1)
-    const added: StoredFood[] = names
-      .filter((name) => !existing.has(name))
-      .map((name, i) => ({ name, addedAt: new Date(start + i).toISOString() }))
+    // 寫法稍有不同（全形半形、大小寫）但其實是同一個的，也算已在清單裡
+    const added: StoredFood[] = uniqueFoods(
+      names,
+      stored.map((f) => f.name),
+    ).map((name, i) => ({ name, addedAt: new Date(start + i).toISOString() }))
     await db.foods.bulkAdd(added)
     return added.length
   })

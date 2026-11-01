@@ -222,6 +222,12 @@ describe('常吃的食物', () => {
     expect(await listFoods()).toEqual(['燕麥', '地瓜'])
   })
 
+  it('寫法稍有不同（全形半形、大小寫）的也算已在清單裡，保留原本的寫法', async () => {
+    await addFoods(['魯肉飯（小）', 'DHC乳清'])
+    expect(await addFoods(['魯肉飯(小)', 'ｄｈｃ乳清', '燕麥', '燕麥'])).toBe(1)
+    expect(await listFoods()).toEqual(['魯肉飯（小）', 'DHC乳清', '燕麥'])
+  })
+
   it('匯入備份時合併食物清單，不重複', async () => {
     await addFoods(['燕麥'])
     await importBackup({ entries: [], conditions: [], foods: ['燕麥', '雞胸肉'] })

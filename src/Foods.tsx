@@ -2,7 +2,9 @@ import { Button, FileButton, Group, Stack, Text, Textarea, TextInput } from '@ma
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useRef, useState } from 'react'
 import { addFoods, deleteFood, listFoods } from '@/data/repository'
-import { filterFoods, parseFoodList } from '@/domain/food'
+import { filterFoods, formatFoodList, splitFoodList } from '@/domain/food'
+import { toDateString } from '@/domain/form'
+import { shareOrDownload } from './shareFile'
 import { Section } from './Section'
 import { Status } from './Status'
 import { useStatus } from './useStatus'
@@ -17,15 +19,16 @@ export function Foods() {
   const resetFileRef = useRef<() => void>(null)
 
   async function importList(source: string) {
-    const names = parseFoodList(source)
+    const names = splitFoodList(source)
     if (names.length === 0) {
       setStatus('沒有找到食物名稱，請一行一個，或用逗號、頓號分隔', true)
       return
     }
     await tryWrite(async () => {
+      // 同一份清單裡重複的、已經在清單裡的（寫法稍有不同也算）都略過，一起算進略過的數量
       const added = await addFoods(names)
       const skipped = names.length - added
-      setStatus(`已加入 ${added} 項` + (skipped > 0 ? `（${skipped} 項已在清單中）` : ''))
+      setStatus(`已加入 ${added} 項` + (skipped > 0 ? `（${skipped} 項重複，已略過）` : ''))
       setText('')
     }, '匯入失敗')
   }
@@ -33,6 +36,20 @@ export function Foods() {
   async function handleFile(file: File | null) {
     resetFileRef.current?.() // 讓同一個檔案可以再選一次
     if (file) await importList(await file.text())
+  }
+
+  /** 匯出成一行一個的文字檔，可以直接用「從檔案匯入」匯回來（換手機或分享給家人） */
+  async function handleExport() {
+    if (!foods || foods.length === 0) return
+    await tryWrite(async () => {
+      const file = new File(
+        [formatFoodList(foods)],
+        `health-diary-foods-${toDateString(new Date())}.txt`,
+        { type: 'text/plain' },
+      )
+      const result = await shareOrDownload(file, '常吃的食物')
+      setStatus(result === 'cancelled' ? '已取消匯出' : `已匯出 ${foods.length} 項`)
+    }, '匯出失敗')
   }
 
   async function handleDelete(name: string) {
@@ -71,6 +88,14 @@ export function Foods() {
               </Button>
             )}
           </FileButton>
+          <Button
+            type="button"
+            variant="light"
+            onClick={handleExport}
+            disabled={!foods || foods.length === 0}
+          >
+            匯出清單
+          </Button>
         </Group>
         <Status status={status} />
 

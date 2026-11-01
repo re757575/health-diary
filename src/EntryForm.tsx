@@ -43,6 +43,7 @@ import { TagPicker } from './TagPicker'
 import { Status } from './Status'
 import { TimeField } from './TimeField'
 import { PRESET_SYMPTOMS } from '@/domain/symptom'
+import { foodsToRemember } from '@/domain/food'
 import type { Medication } from '@/domain/medication'
 import { PRESET_TAGS, addTag, toggleTag } from '@/domain/tag'
 import { ChipChoices } from './ChipChoices'
@@ -212,7 +213,9 @@ export function EntryForm({
     await tryWrite(async () => {
       await saveEntry(parsed.data)
       // 第一次吃的食物自動加進常吃清單，之後就能直接點選
-      await addFoods(parsed.data.meals.flatMap((m) => m.items?.map((i) => i.name) ?? []))
+      await addFoods(
+        foodsToRemember(parsed.data.meals.flatMap((m) => m.items?.map((i) => i.name) ?? [])),
+      )
       setRestored(undefined)
       setStatus(`已儲存 ${parsed.data.date} 的紀錄`)
     }, '儲存失敗，輸入的內容已存成草稿')

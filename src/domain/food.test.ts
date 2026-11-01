@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import type { Entry, MealType } from './entry'
-import { filterFoods, parseFoodList, sortFoodsByUsage } from './food'
+import {
+  filterFoods,
+  foodKey,
+  foodsToRemember,
+  formatFoodList,
+  parseFoodList,
+  sortFoodsByUsage,
+  uniqueFoods,
+} from './food'
 
 describe('parseFoodList', () => {
   it('一行一個，或用逗號、頓號、分號、空格、Tab 分隔都可以；保留順序、去掉重複與空白', () => {
@@ -53,5 +61,44 @@ describe('sortFoodsByUsage', () => {
       '香蕉',
       '雞胸肉',
     ])
+  })
+})
+
+describe('匯出食物清單', () => {
+  it('一行一個；匯出的內容再匯入得到相同的清單', () => {
+    const foods = ['燕麥', '魯肉飯（小）', '無糖豆漿']
+    expect(formatFoodList(foods)).toBe('燕麥\n魯肉飯（小）\n無糖豆漿\n')
+    expect(parseFoodList(formatFoodList(foods))).toEqual(foods)
+    expect(formatFoodList([])).toBe('')
+  })
+})
+
+describe('foodsToRemember', () => {
+  it('不重複；名稱有空格或過長的不放進清單，確保匯出再匯入不會被拆開', () => {
+    expect(foodsToRemember(['燕麥', ' 燕麥 ', 'DHC 乳清', '', '很長'.repeat(20), '香蕉'])).toEqual([
+      '燕麥',
+      '香蕉',
+    ])
+  })
+})
+
+describe('排除重複的食物', () => {
+  it('全形半形、大小寫、空白的差異都算同一個', () => {
+    expect(foodKey('魯肉飯（小）')).toBe(foodKey('魯肉飯(小)'))
+    expect(foodKey('ＤＨＣ乳清')).toBe(foodKey('dhc 乳清'))
+    expect(foodKey('豆漿')).not.toBe(foodKey('無糖豆漿'))
+  })
+
+  it('保留先出現的寫法與順序；已在清單裡的也略過', () => {
+    expect(uniqueFoods(['魯肉飯（小）', '燕麥', '魯肉飯(小)', 'ＤＨＣ乳清', 'DHC乳清'])).toEqual([
+      '魯肉飯（小）',
+      '燕麥',
+      'ＤＨＣ乳清',
+    ])
+    expect(uniqueFoods(['燕麥', 'Banana', '地瓜'], ['banana', '燕麥'])).toEqual(['地瓜'])
+  })
+
+  it('匯入清單時，同一份裡寫法稍有不同的重複也去掉', () => {
+    expect(parseFoodList('魯肉飯（小）\n魯肉飯(小)\n燕麥\n燕麥')).toEqual(['魯肉飯（小）', '燕麥'])
   })
 })

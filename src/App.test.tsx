@@ -960,12 +960,12 @@ describe('常吃的食物', () => {
     const section = await screen.findByRole('region', { name: '常吃的食物' })
     await user.type(within(section).getByLabelText('貼上食物清單'), '燕麥、香蕉\n地瓜，香蕉')
     await user.click(within(section).getByRole('button', { name: '匯入清單' }))
-    expect(await within(section).findByText('已加入 3 項')).toBeInTheDocument()
+    expect(await within(section).findByText('已加入 3 項（1 項重複，已略過）')).toBeInTheDocument()
     expect(within(section).getByText('目前 3 項（點一下移除）')).toBeInTheDocument()
 
     await user.type(within(section).getByLabelText('貼上食物清單'), '香蕉、蘋果')
     await user.click(within(section).getByRole('button', { name: '匯入清單' }))
-    expect(await within(section).findByText('已加入 1 項（1 項已在清單中）')).toBeInTheDocument()
+    expect(await within(section).findByText('已加入 1 項（1 項重複，已略過）')).toBeInTheDocument()
 
     await openTab(user, '今天')
     const chipNames = (meal: string) =>
@@ -987,6 +987,30 @@ describe('常吃的食物', () => {
     await user.click(within(section).getByRole('button', { name: '移除 香蕉' }))
     expect(await within(section).findByText('已移除「香蕉」')).toBeInTheDocument()
     expect(await db.foods.count()).toBe(3)
+  })
+
+  it('匯出清單：一行一個的文字檔，可以再匯入；清單是空的時不能匯出', async () => {
+    const user = userEvent.setup()
+    const createObjectURL = vi.fn((_file: Blob) => 'blob:foods')
+    URL.createObjectURL = createObjectURL
+    URL.revokeObjectURL = vi.fn()
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    render(<App />)
+    await openTab(user, '設定')
+    const section = await screen.findByRole('region', { name: '常吃的食物' })
+    expect(within(section).getByRole('button', { name: '匯出清單' })).toBeDisabled()
+
+    await user.type(within(section).getByLabelText('貼上食物清單'), '燕麥、魯肉飯（小）')
+    await user.click(within(section).getByRole('button', { name: '匯入清單' }))
+    await within(section).findByText('已加入 2 項')
+    await user.click(within(section).getByRole('button', { name: '匯出清單' }))
+
+    expect(await within(section).findByText('已匯出 2 項')).toBeInTheDocument()
+    expect(click).toHaveBeenCalled()
+    const file = createObjectURL.mock.calls[0]![0] as File
+    expect(file.name).toMatch(/^health-diary-foods-\d{4}-\d{2}-\d{2}\.txt$/)
+    expect(await file.text()).toBe('燕麥\n魯肉飯（小）\n')
+    click.mockRestore()
   })
 
   it('從 .txt 檔匯入；檔案裡沒有食物名稱時說明格式', async () => {

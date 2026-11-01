@@ -613,6 +613,17 @@ test('常吃的食物：匯入清單 → 早餐直接點選 → 存檔後進 AI 
   await foods.getByRole('button', { name: '匯入清單' }).click()
   await expect(foods.getByText('已加入 3 項')).toBeVisible()
 
+  // 匯出清單：電腦上直接下載一行一個的文字檔
+  const downloadPromise = page.waitForEvent('download')
+  await foods.getByRole('button', { name: '匯出清單' }).click()
+  const download = await downloadPromise
+  expect(download.suggestedFilename()).toMatch(/^health-diary-foods-\d{4}-\d{2}-\d{2}\.txt$/)
+  const stream = await download.createReadStream()
+  const chunks: Buffer[] = []
+  for await (const chunk of stream) chunks.push(chunk as Buffer)
+  expect(Buffer.concat(chunks).toString('utf8')).toBe('燕麥\n香蕉\n無糖豆漿\n')
+  await expect(foods.getByText('已匯出 3 項')).toBeVisible()
+
   await openTab(page, '今天')
   await page.getByLabel('新增食物：早餐').click()
   const chips = page.getByRole('group', { name: '常吃的食物：早餐' })

@@ -879,4 +879,14 @@ describe('EntryForm：餐點的食物', () => {
     await screen.findByText(`已儲存 ${DATE} 的紀錄`)
     expect(await db.foods.get('鮭魚')).toBeDefined()
   })
+
+  it('名稱有空格的食物照樣存進餐點，但不加進常吃清單（清單用空格分隔，匯出再匯入會被拆開）', async () => {
+    const user = userEvent.setup()
+    renderForm()
+    await user.type(screen.getByLabelText('新增食物：晚餐'), 'Big Mac{Enter}')
+    await user.click(screen.getByRole('button', { name: '儲存' }))
+    await screen.findByText(`已儲存 ${DATE} 的紀錄`)
+    expect((await getEntry(DATE))?.meals[0]?.items?.[0]?.name).toBe('Big Mac')
+    expect(await db.foods.count()).toBe(0)
+  })
 })
