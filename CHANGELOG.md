@@ -2,6 +2,11 @@
 
 本檔案由 [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) 依照 [Conventional Commits](https://www.conventionalcommits.org/) 規範的 commit 訊息自動產生，請勿手動編輯內容，執行 `npm run release` 即可更新。
 
+## [0.1.12](https://github.com/re757575/health-diary/compare/v0.1.11...v0.1.12) (2026-11-01)
+
+### Features
+
+* **medication:** 新增藥物與保健食品紀錄 ([fae7993](https://github.com/re757575/health-diary/commit/fae7993a8c833b9df3878505c54da0be52e8bfb1))
 ## [0.1.11](https://github.com/re757575/health-diary/compare/v0.1.10...v0.1.11) (2026-10-31)
 
 ### Features
