@@ -173,7 +173,9 @@ export default function App() {
 
         <Tabs.Panel value="trends" pt="md">
           <Stack gap="md">
-            {history && <TrendCharts entries={history} today={new Date()} />}
+            {history && (
+              <TrendCharts entries={history} today={new Date()} medications={medications} />
+            )}
 
             {history && <HistoryList entries={history} editingDate={date} onEdit={editDate} />}
           </Stack>

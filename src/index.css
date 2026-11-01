@@ -232,6 +232,13 @@ textarea.mantine-Textarea-input {
   background: var(--series);
 }
 
+/* 固定用藥：每種藥一段，段與段之間留白；長條沿用症狀的軌道樣式 */
+.medication-trend {
+  display: grid;
+  gap: 0.25rem;
+  margin-top: 0.75rem;
+}
+
 /* 同一個顏色用不透明度分輕、中、重，深色代表比較嚴重 */
 .symptom-seg-1 {
   opacity: 0.4;

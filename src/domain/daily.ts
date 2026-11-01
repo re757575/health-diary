@@ -62,8 +62,9 @@ export const SHORT_SLEEP_HOURS = 6.5
 /** 兩組各要累積幾天才顯示對照，天數太少的差異多半只是巧合 */
 export const MIN_COMPARE_DAYS = 3
 
-export interface SleepGroup {
-  /** 這組的天數（有睡眠時數的日子） */
+/** 一組日子（例如睡不夠的日子、有吃藥的日子）的心情與症狀摘要 */
+export interface DayGroup {
+  /** 這組的天數 */
   days: number
   /** 平均心情；這組沒有人填心情時為 undefined */
   moodAvg?: number
@@ -73,13 +74,14 @@ export interface SleepGroup {
 }
 
 export interface SleepComparison {
-  short: SleepGroup
-  enough: SleepGroup
+  short: DayGroup
+  enough: DayGroup
 }
 
 const round1 = (n: number) => Math.round(n * 10) / 10
 
-function summarizeGroup(cells: DailyCell[]): SleepGroup {
+/** 一組日子的平均心情與有症狀的比例 */
+export function summarizeGroup(cells: DailyCell[]): DayGroup {
   const moods = cells.flatMap((c) => (c.mood === undefined ? [] : [c.mood]))
   const judged = cells.filter((c) => c.symptomLevel !== undefined)
   return {

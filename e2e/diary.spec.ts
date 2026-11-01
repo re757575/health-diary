@@ -580,4 +580,10 @@ test('用藥：設定登記固定用藥 → 每日預設有吃、標沒吃、加
   await expect(prompt).toContainText('- DHC 持續型維他命C（1000mg）：')
   await expect(prompt).toContainText('- 固定用藥沒吃：DHC 持續型維他命C')
   await expect(prompt).toContainText('- 臨時用藥：普拿疼')
+
+  // 趨勢頁：今天開始吃、今天沒吃
+  await openTab(page, '趨勢')
+  await expect(page.getByRole('figure', { name: '固定用藥' })).toContainText(
+    '服藥 0／1 天（沒吃 1 天）',
+  )
 })

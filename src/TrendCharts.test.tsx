@@ -348,3 +348,72 @@ describe('TrendCharts：切換區間', () => {
     expect(screen.getByText('最近 1 年還沒有睡眠紀錄（需要填入睡與起床時間）')).toBeInTheDocument()
   })
 })
+
+describe('TrendCharts：固定用藥', () => {
+  const vitC = { id: 'c', name: '維他命C', startDate: '2026-10-19' }
+  const sleep = { bedtime: '23:00', wakeTime: '07:00' }
+
+  it('沒有固定用藥時不顯示這一段', () => {
+    render(<TrendCharts entries={[entry('2026-10-28', { mood: 3 })]} today={today} />)
+    expect(screen.queryByRole('figure', { name: '固定用藥' })).not.toBeInTheDocument()
+  })
+
+  it('顯示服藥天數；都有吃時說明沒有可對照的日子', () => {
+    render(<TrendCharts entries={[]} today={today} medications={[vitC]} />)
+
+    const figure = screen.getByRole('figure', { name: '固定用藥' })
+    // 10/19～10/28 共 10 天
+    expect(within(figure).getByRole('region', { name: '維他命C' })).toHaveTextContent(
+      '服藥 10／10 天',
+    )
+    expect(figure).toHaveTextContent('這段期間都有吃，沒有沒吃的日子可以對照')
+  })
+
+  it('有吃與沒吃各累積 3 天後，顯示心情與症狀的對照表', () => {
+    const missedDay = (date: string) =>
+      entry(date, {
+        mood: 2,
+        sleep,
+        missedMedications: ['c'],
+        symptomItems: [{ name: '頭痛', severity: 2 }],
+      })
+    render(
+      <TrendCharts
+        entries={[
+          entry('2026-10-20', { mood: 4, sleep }),
+          entry('2026-10-21', { mood: 4, sleep }),
+          entry('2026-10-22', { mood: 5, sleep }),
+          missedDay('2026-10-23'),
+          missedDay('2026-10-24'),
+          missedDay('2026-10-25'),
+        ]}
+        today={today}
+        medications={[vitC]}
+      />,
+    )
+
+    const figure = screen.getByRole('figure', { name: '固定用藥' })
+    expect(figure).toHaveTextContent('服藥 7／10 天（沒吃 3 天）')
+    const rows = within(
+      within(figure).getByRole('table', { name: '維他命C有吃與沒吃的對照' }),
+    ).getAllByRole('row')
+    expect(rows.map((r) => r.textContent)).toEqual([
+      '分組天數平均心情有症狀',
+      '有吃3 天4.30／3 天',
+      '沒吃3 天23／3 天',
+    ])
+  })
+
+  it('沒吃的日子還不夠時，說明各要累積幾天', () => {
+    render(
+      <TrendCharts
+        entries={[entry('2026-10-23', { mood: 2, missedMedications: ['c'] })]}
+        today={today}
+        medications={[vitC]}
+      />,
+    )
+    expect(screen.getByRole('figure', { name: '固定用藥' })).toHaveTextContent(
+      '有吃（0 天）與沒吃（1 天）的紀錄各累積 3 天後，才會顯示心情與症狀的對照',
+    )
+  })
+})
