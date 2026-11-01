@@ -2,6 +2,11 @@
 
 本檔案由 [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) 依照 [Conventional Commits](https://www.conventionalcommits.org/) 規範的 commit 訊息自動產生，請勿手動編輯內容，執行 `npm run release` 即可更新。
 
+## [0.1.15](https://github.com/re757575/health-diary/compare/v0.1.14...v0.1.15) (2026-11-01)
+
+### Features
+
+* **report:** 新增就醫報告，選一段期間整理給醫生看的重點 ([00d9cfb](https://github.com/re757575/health-diary/commit/00d9cfb3fdaac5201dc0de0e10b0b38dfbf603f6))
 ## [0.1.14](https://github.com/re757575/health-diary/compare/v0.1.13...v0.1.14) (2026-11-01)
 
 ### Features
