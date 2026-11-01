@@ -42,9 +42,41 @@ export const BRISTOL_DESCRIPTIONS = [
   '第 7 型：水狀，完全沒有固體（嚴重腹瀉）',
 ] as const
 
+/** 食物份量的單位，表單用下拉選單選；預設「份」 */
+export const FOOD_UNITS = [
+  '份',
+  '碗',
+  '盤',
+  '杯',
+  '瓶',
+  '顆',
+  '個',
+  '片',
+  '塊',
+  '根',
+  '條',
+  '盒',
+  '包',
+  '匙',
+  'g',
+  'ml',
+] as const
+
+export const DEFAULT_FOOD_UNIT = '份'
+
+const foodItemSchema = z.object({
+  name: z.string().trim().min(1),
+  amount: z.number().positive(),
+  /** 不限定在 FOOD_UNITS：之後調整選項時，舊資料與備份仍然合法 */
+  unit: z.string().trim().min(1),
+})
+
 const mealSchema = z.object({
   type: z.enum(MEAL_TYPES),
-  description: z.string(),
+  /** 這餐吃的食物與份量（v7 新增） */
+  items: z.array(foodItemSchema).optional(),
+  /** 這餐的備註，例如外食、家裡煮；v7 之前整餐都用文字寫在這裡 */
+  description: z.string().optional(),
 })
 
 const bowelSchema = z.object({
@@ -108,6 +140,7 @@ export const entrySchema = z.object({
 
 export type Entry = z.infer<typeof entrySchema>
 export type Meal = z.infer<typeof mealSchema>
+export type FoodItem = z.infer<typeof foodItemSchema>
 export type Bowel = z.infer<typeof bowelSchema>
 export type SymptomItem = z.infer<typeof symptomItemSchema>
 

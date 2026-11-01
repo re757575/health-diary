@@ -5,7 +5,8 @@ import type { FormValues } from '@/domain/form'
  * 安裝成 App 後切到別的 App 時常被系統關掉，表單內容只在記憶體裡就會消失。
  * 用 localStorage 是因為它是同步寫入：被關掉前一定寫得完，IndexedDB 不保證
  */
-const KEY = 'health-diary:drafts'
+// v2：餐點改成一項項的食物，舊格式的草稿不再讀取
+const KEY = 'health-diary:drafts:v2'
 
 /** 太久以前的草稿多半不會再用，存檔時順便清掉 */
 const MAX_AGE_DAYS = 30

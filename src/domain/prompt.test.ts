@@ -256,3 +256,25 @@ describe('用藥', () => {
     expect(buildAnalysisPrompt([entry('2026-10-28')])).not.toContain('# 固定服用的藥物')
   })
 })
+
+describe('餐點', () => {
+  it('食物與份量在前、備註在後；只有備註的餐點照樣列出', () => {
+    const prompt = buildAnalysisPrompt([
+      entry('2026-10-28', {
+        meals: [
+          {
+            type: 'breakfast',
+            items: [
+              { name: '燕麥', amount: 1, unit: '份' },
+              { name: '白飯', amount: 0.5, unit: '碗' },
+            ],
+            description: '早餐店',
+          },
+          { type: 'dinner', description: '外食' },
+        ],
+      }),
+    ])
+    expect(prompt).toContain('- 早餐：燕麥 1 份、白飯 0.5 碗；早餐店')
+    expect(prompt).toContain('- 晚餐：外食')
+  })
+})

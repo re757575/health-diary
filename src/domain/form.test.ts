@@ -7,6 +7,7 @@ import {
   fillEmptyMeals,
   formToEntry,
   isSameEntry,
+  toggleFoodItem,
   shiftDate,
   toDateString,
   toTimeString,
@@ -45,29 +46,51 @@ describe('addWater', () => {
 })
 
 describe('fillEmptyMeals', () => {
-  const meals = (b: string, l = '', d = '', s = '') => ({
+  const meal = (...names: string[]) => ({
+    items: names.map((name) => ({ name, amount: '1', unit: '份' })),
+    note: '',
+  })
+  const meals = (b = meal(), l = meal(), d = meal(), sn = meal()) => ({
     breakfast: b,
     lunch: l,
     dinner: d,
-    snack: s,
+    snack: sn,
   })
 
   it('只補空著的餐別，已有內容的不動', () => {
-    const result = fillEmptyMeals(meals('我的早餐', ''), meals('昨天早餐', '昨天午餐'))
-    expect(result.meals).toEqual(meals('我的早餐', '昨天午餐'))
+    const result = fillEmptyMeals(
+      meals(meal('我的早餐')),
+      meals(meal('昨天早餐'), meal('昨天午餐')),
+    )
+    expect(result.meals).toEqual(meals(meal('我的早餐'), meal('昨天午餐')))
     expect(result.filled).toBe(1)
   })
 
-  it('只有空白的餐別視為空；來源只有空白的不帶入', () => {
-    const result = fillEmptyMeals(meals('  ', ''), meals('豆漿', '  '))
-    expect(result.meals).toEqual(meals('豆漿', ''))
+  it('只有備註的餐別也算有內容；備註只有空白的算空', () => {
+    const noted = { items: [], note: '外食' }
+    const result = fillEmptyMeals(
+      meals({ items: [], note: '  ' }, noted),
+      meals(meal('豆漿'), meal('昨天午餐')),
+    )
+    expect(result.meals).toEqual(meals(meal('豆漿'), noted))
     expect(result.filled).toBe(1)
   })
 
-  it('不修改傳入的物件', () => {
-    const current = meals('')
-    fillEmptyMeals(current, meals('豆漿'))
-    expect(current).toEqual(meals(''))
+  it('不修改傳入的物件，帶入的食物是複製的', () => {
+    const current = meals()
+    const source = meals(meal('豆漿'))
+    const { meals: filled } = fillEmptyMeals(current, source)
+    expect(current).toEqual(meals())
+    filled.breakfast.items[0]!.amount = '2'
+    expect(source.breakfast.items[0]!.amount).toBe('1')
+  })
+})
+
+describe('toggleFoodItem', () => {
+  it('還沒有就加入，預設 1 份；已經有就拿掉', () => {
+    const added = toggleFoodItem({ items: [], note: '外食' }, '燕麥')
+    expect(added).toEqual({ items: [{ name: '燕麥', amount: '1', unit: '份' }], note: '外食' })
+    expect(toggleFoodItem(added, '燕麥')).toEqual({ items: [], note: '外食' })
   })
 })
 
@@ -85,11 +108,36 @@ describe('formToEntry', () => {
     expect(formToEntry(form)).toMatchObject({ weightKg: 70.5, waterMl: 0, mood: 3 })
   })
 
-  it('只收有內容的餐點，並去除前後空白', () => {
+  it('只收有內容的餐點：食物轉成數字份量（空白當 1），備註去掉前後空白，空的省略', () => {
     const form = emptyForm('2026-10-28')
-    form.meals.breakfast = '  蛋餅  '
-    form.meals.dinner = '   '
-    expect(formToEntry(form).meals).toEqual([{ type: 'breakfast', description: '蛋餅' }])
+    form.meals.breakfast = {
+      items: [
+        { name: ' 蛋餅 ', amount: '', unit: '份' },
+        { name: '白飯', amount: '0.5', unit: '碗' },
+      ],
+      note: '',
+    }
+    form.meals.lunch = { items: [], note: '  外食  ' }
+    form.meals.dinner = { items: [], note: '   ' }
+    const entry = formToEntry(form)
+    expect(entry.meals).toEqual([
+      {
+        type: 'breakfast',
+        items: [
+          { name: '蛋餅', amount: 1, unit: '份' },
+          { name: '白飯', amount: 0.5, unit: '碗' },
+        ],
+      },
+      { type: 'lunch', description: '外食' },
+    ])
+    expect(entrySchema.parse(entry)).toEqual(entry)
+    expect(formToEntry(entryToForm(entry))).toEqual(entry)
+  })
+
+  it('份量是 0 或不是數字時不合法', () => {
+    const form = emptyForm('2026-10-28')
+    form.meals.snack = { items: [{ name: '堅果', amount: '0', unit: '份' }], note: '' }
+    expect(entrySchema.safeParse(formToEntry(form)).success).toBe(false)
   })
 
   it('捨棄全空的排便列，保留有任一欄位的列', () => {
@@ -165,7 +213,9 @@ describe('isSameEntry', () => {
 
   it('改了任何會存下來的內容就不同', () => {
     expect(isSameEntry(base, { ...base, weightKg: '70' })).toBe(false)
-    expect(isSameEntry(base, { ...base, meals: { ...base.meals, lunch: '便當' } })).toBe(false)
+    expect(
+      isSameEntry(base, { ...base, meals: { ...base.meals, lunch: { items: [], note: '便當' } } }),
+    ).toBe(false)
     expect(isSameEntry(base, { ...base, symptomItems: [{ name: '頭痛', severity: 1 }] })).toBe(
       false,
     )

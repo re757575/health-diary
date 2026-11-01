@@ -26,6 +26,7 @@ beforeEach(async () => {
     db.profile.clear(),
     db.meta.clear(),
     db.medications.clear(),
+    db.foods.clear(),
   ])
 })
 
@@ -35,7 +36,7 @@ describe('App', () => {
     render(<App />)
 
     await user.type(await screen.findByLabelText('體重（kg）'), '70.5')
-    await user.type(screen.getByLabelText('早餐'), '燕麥奶')
+    await user.type(screen.getByLabelText('早餐備註'), '燕麥奶')
     await user.click(screen.getByRole('button', { name: '儲存' }))
 
     expect(await screen.findByText(/已儲存 \d{4}-\d{2}-\d{2} 的紀錄/)).toBeInTheDocument()
@@ -170,7 +171,14 @@ describe('分頁', () => {
     expect(screen.queryByRole('region', { name: '每日紀錄' })).not.toBeInTheDocument()
 
     await openTab(user, '設定')
-    for (const name of ['已知疾病', '藥物與保健食品', '基本資料', 'AI 分析與資料備份', '關於']) {
+    for (const name of [
+      '已知疾病',
+      '藥物與保健食品',
+      '常吃的食物',
+      '基本資料',
+      'AI 分析與資料備份',
+      '關於',
+    ]) {
       expect(await screen.findByRole('region', { name })).toBeInTheDocument()
     }
     expect(screen.queryByRole('region', { name: '歷史紀錄' })).not.toBeInTheDocument()
@@ -181,12 +189,12 @@ describe('分頁', () => {
     render(<App />)
 
     await user.type(await screen.findByLabelText('體重（kg）'), '70.5')
-    await user.type(screen.getByLabelText('早餐'), '燕麥奶')
+    await user.type(screen.getByLabelText('早餐備註'), '燕麥奶')
     await openTab(user, '設定')
     await openTab(user, '今天')
 
     expect(screen.getByLabelText('體重（kg）')).toHaveValue(70.5)
-    expect(screen.getByLabelText('早餐')).toHaveValue('燕麥奶')
+    expect(screen.getByLabelText('早餐備註')).toHaveValue('燕麥奶')
   })
 
   it('在歷史紀錄按「編輯」會切回「今天」並載入那一天', async () => {
@@ -510,7 +518,7 @@ describe('切換日期', () => {
       await db.entries.put({ date: '2026-01-02', weightKg: 65, meals: [], bowel: [] })
       render(<App />)
 
-      await user.type(await screen.findByLabelText('早餐'), '燕麥奶')
+      await user.type(await screen.findByLabelText('早餐備註'), '燕麥奶')
       await openTab(user, '趨勢')
       await user.click(await screen.findByRole('button', { name: '編輯 2026-01-02' }))
 
@@ -518,7 +526,7 @@ describe('切換日期', () => {
       expect(screen.getByRole('tab', { name: '趨勢' })).toHaveAttribute('aria-selected', 'true')
       await openTab(user, '今天')
       expect(screen.getByLabelText('日期')).toHaveValue(today)
-      expect(screen.getByLabelText('早餐')).toHaveValue('燕麥奶')
+      expect(screen.getByLabelText('早餐備註')).toHaveValue('燕麥奶')
       confirm.mockRestore()
     })
 
@@ -606,14 +614,14 @@ describe('刪除紀錄', () => {
     const user = userEvent.setup()
     await db.entries.put({ date: today, weightKg: 70, meals: [], bowel: [] })
     render(<App />)
-    await user.type(await screen.findByLabelText('早餐'), '燕麥奶')
+    await user.type(await screen.findByLabelText('早餐備註'), '燕麥奶')
 
     await openTab(user, '趨勢')
     await user.click(await screen.findByRole('button', { name: `刪除 ${today}` }))
     await screen.findByText(`已刪除 ${today} 的紀錄`)
     await openTab(user, '今天')
 
-    expect(screen.getByLabelText('早餐')).toHaveValue('燕麥奶')
+    expect(screen.getByLabelText('早餐備註')).toHaveValue('燕麥奶')
     expect(screen.getByLabelText('體重（kg）')).toHaveValue(70)
   })
 })
@@ -927,6 +935,79 @@ describe('藥物與保健食品', () => {
       await within(section).findByText('請填寫名稱與開始日期；最後一天不能早於開始日期'),
     ).toBeInTheDocument()
     expect(await db.medications.count()).toBe(0)
+  })
+})
+
+describe('常吃的食物', () => {
+  it('貼上清單匯入，重複的略過；每日紀錄點選早餐時列出，常吃的排前面；可以移除', async () => {
+    const user = userEvent.setup()
+    await db.entries.put({
+      date: '2026-01-02',
+      meals: [
+        {
+          type: 'lunch',
+          items: [
+            { name: '地瓜', amount: 1, unit: '份' },
+            { name: '雞胸肉', amount: 1, unit: '份' },
+          ],
+        },
+      ],
+      bowel: [],
+    })
+    render(<App />)
+
+    await openTab(user, '設定')
+    const section = await screen.findByRole('region', { name: '常吃的食物' })
+    await user.type(within(section).getByLabelText('貼上食物清單'), '燕麥、香蕉\n地瓜，香蕉')
+    await user.click(within(section).getByRole('button', { name: '匯入清單' }))
+    expect(await within(section).findByText('已加入 3 項')).toBeInTheDocument()
+    expect(within(section).getByText('目前 3 項（點一下移除）')).toBeInTheDocument()
+
+    await user.type(within(section).getByLabelText('貼上食物清單'), '香蕉、蘋果')
+    await user.click(within(section).getByRole('button', { name: '匯入清單' }))
+    expect(await within(section).findByText('已加入 1 項（1 項已在清單中）')).toBeInTheDocument()
+
+    await openTab(user, '今天')
+    const chipNames = (meal: string) =>
+      within(screen.getByRole('group', { name: `常吃的食物：${meal}` }))
+        .getAllByRole('button')
+        .map((b) => b.textContent)
+    // 午餐吃過地瓜，午餐的地瓜排最前；早餐沒吃過，照匯入的順序
+    await user.click(await screen.findByLabelText('新增食物：午餐'))
+    expect(chipNames('午餐')).toEqual(['地瓜', '燕麥', '香蕉', '蘋果'])
+    await user.click(screen.getByLabelText('新增食物：早餐'))
+    expect(chipNames('早餐')).toEqual(['燕麥', '香蕉', '地瓜', '蘋果'])
+
+    await openTab(user, '設定')
+    await user.type(within(section).getByLabelText('搜尋清單'), '蕉')
+    expect(within(section).getByText('符合 1 項（共 4 項，點一下移除）')).toBeInTheDocument()
+    expect(
+      within(within(section).getByRole('group', { name: '常吃的食物清單' })).getAllByRole('button'),
+    ).toHaveLength(1)
+    await user.click(within(section).getByRole('button', { name: '移除 香蕉' }))
+    expect(await within(section).findByText('已移除「香蕉」')).toBeInTheDocument()
+    expect(await db.foods.count()).toBe(3)
+  })
+
+  it('從 .txt 檔匯入；檔案裡沒有食物名稱時說明格式', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await openTab(user, '設定')
+    const section = await screen.findByRole('region', { name: '常吃的食物' })
+
+    await user.upload(
+      within(section).getByLabelText('從檔案匯入食物清單'),
+      new File(['燕麥\n香蕉\n'], 'foods.txt', { type: 'text/plain' }),
+    )
+    expect(await within(section).findByText('已加入 2 項')).toBeInTheDocument()
+
+    await user.upload(
+      within(section).getByLabelText('從檔案匯入食物清單'),
+      new File(['\n  \n'], 'empty.txt', { type: 'text/plain' }),
+    )
+    expect(
+      await within(section).findByText('沒有找到食物名稱，請一行一個，或用逗號、頓號分隔'),
+    ).toBeInTheDocument()
   })
 })
 

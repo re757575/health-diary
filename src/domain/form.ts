@@ -1,4 +1,17 @@
-import { MEAL_TYPES, type Entry, type MealType, type SymptomItem } from './entry'
+import { DEFAULT_FOOD_UNIT, MEAL_TYPES, type Entry, type MealType, type SymptomItem } from './entry'
+
+export interface FoodItemFormValues {
+  name: string
+  /** 數量；空字串視為 1 */
+  amount: string
+  unit: string
+}
+
+export interface MealFormValues {
+  items: FoodItemFormValues[]
+  /** 這餐的備註，例如外食、家裡煮 */
+  note: string
+}
 
 export interface BowelFormValues {
   time: string
@@ -13,7 +26,7 @@ export interface FormValues {
   bedtime: string
   wakeTime: string
   sleepQuality: string
-  meals: Record<MealType, string>
+  meals: Record<MealType, MealFormValues>
   bowel: BowelFormValues[]
   /** 確認當天沒有排便；有排便紀錄時不算數 */
   noBowel: boolean
@@ -52,6 +65,23 @@ export function addWater(current: string, ml: number): string {
   return String((Number(current) || 0) + ml)
 }
 
+export const emptyMeal = (): MealFormValues => ({ items: [], note: '' })
+
+/** 這餐還沒填任何東西 */
+export const isEmptyMeal = (meal: MealFormValues) =>
+  meal.items.length === 0 && meal.note.trim() === ''
+
+/** 點選食物：還沒有就加入（預設 1 份），已經有就拿掉 */
+export function toggleFoodItem(meal: MealFormValues, name: string): MealFormValues {
+  const exists = meal.items.some((i) => i.name === name)
+  return {
+    ...meal,
+    items: exists
+      ? meal.items.filter((i) => i.name !== name)
+      : [...meal.items, { name, amount: '1', unit: DEFAULT_FOOD_UNIT }],
+  }
+}
+
 /** 把另一天的餐點補進還空著的餐別，已有內容的不動。回傳新的餐點與補了幾個餐別 */
 export function fillEmptyMeals(
   current: FormValues['meals'],
@@ -60,8 +90,8 @@ export function fillEmptyMeals(
   const meals = { ...current }
   let filled = 0
   for (const type of MEAL_TYPES) {
-    if (meals[type].trim() === '' && source[type].trim() !== '') {
-      meals[type] = source[type]
+    if (isEmptyMeal(meals[type]) && !isEmptyMeal(source[type])) {
+      meals[type] = { items: source[type].items.map((i) => ({ ...i })), note: source[type].note }
       filled++
     }
   }
@@ -75,7 +105,7 @@ export function emptyForm(date: string): FormValues {
     bedtime: '',
     wakeTime: '',
     sleepQuality: '',
-    meals: { breakfast: '', lunch: '', dinner: '', snack: '' },
+    meals: { breakfast: emptyMeal(), lunch: emptyMeal(), dinner: emptyMeal(), snack: emptyMeal() },
     bowel: [],
     noBowel: false,
     waterMl: '',
@@ -113,8 +143,19 @@ export function formToEntry(form: FormValues): Entry {
     weightKg: toNumber(form.weightKg),
     sleep: hasSleep ? sleep : undefined,
     meals: MEAL_TYPES.flatMap((type) => {
-      const description = form.meals[type].trim()
-      return description ? [{ type, description }] : []
+      const { items, note } = form.meals[type]
+      const foods = items
+        .filter((i) => i.name.trim() !== '')
+        .map((i) => ({
+          name: i.name.trim(),
+          amount: i.amount.trim() === '' ? 1 : Number(i.amount),
+          unit: i.unit,
+        }))
+      const description = toText(note)
+      if (foods.length === 0 && !description) return []
+      return [
+        { type, ...(foods.length > 0 && { items: foods }), ...(description && { description }) },
+      ]
     }),
     bowel,
     noBowel: form.noBowel && bowel.length === 0 ? true : undefined,
@@ -142,7 +183,12 @@ export function isSameEntry(a: FormValues, b: FormValues): boolean {
 export function entryToForm(entry: Entry): FormValues {
   const form = emptyForm(entry.date)
   const str = (n: number | undefined) => (n === undefined ? '' : String(n))
-  for (const meal of entry.meals) form.meals[meal.type] = meal.description
+  for (const meal of entry.meals) {
+    form.meals[meal.type] = {
+      items: (meal.items ?? []).map((i) => ({ ...i, amount: String(i.amount) })),
+      note: meal.description ?? '',
+    }
+  }
   return {
     ...form,
     weightKg: str(entry.weightKg),

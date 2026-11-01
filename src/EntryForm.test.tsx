@@ -12,7 +12,7 @@ import { EntryForm } from './EntryForm'
 const DATE = '2026-10-29'
 
 beforeEach(async () => {
-  await db.entries.clear()
+  await Promise.all([db.entries.clear(), db.foods.clear()])
 })
 
 const renderForm = () => render(<EntryForm initial={emptyForm(DATE)} onDateChange={() => {}} />)
@@ -284,15 +284,21 @@ describe('EntryForm：快速輸入', () => {
 
   describe('複製前一天的餐點', () => {
     const copy = () => screen.getByRole('button', { name: '複製前一天的餐點' })
+    const food = (name: string, amount = 1, unit = '份') => ({ name, amount, unit })
+    /** 某一餐列出的食物名稱 */
+    const foodsIn = (meal: string) =>
+      within(screen.getByRole('group', { name: meal }))
+        .queryAllByRole('button', { name: /^移除 / })
+        .map((b) => b.getAttribute('aria-label')!.replace('移除 ', ''))
 
-    it('把前一天的餐點帶進空著的餐別，不帶體重、飲水等每天不同的欄位', async () => {
+    it('把前一天的餐點（食物、份量與備註）帶進空著的餐別，不帶體重、飲水等每天不同的欄位', async () => {
       await saveEntry({
         date: '2026-10-28',
         weightKg: 68,
         waterMl: 2000,
         meals: [
-          { type: 'breakfast', description: '豆漿 蛋餅' },
-          { type: 'dinner', description: '白飯 青菜' },
+          { type: 'breakfast', items: [food('豆漿'), food('蛋餅')] },
+          { type: 'dinner', items: [food('白飯', 0.5, '碗')], description: '家裡煮' },
         ],
         bowel: [{ time: '08:15', bristol: 3 }],
       })
@@ -305,9 +311,12 @@ describe('EntryForm：快速輸入', () => {
         expect(screen.getByRole('status')).toHaveTextContent('已帶入 2026-10-28 的 2 個餐別'),
       )
 
-      expect(screen.getByLabelText('早餐')).toHaveValue('豆漿 蛋餅')
-      expect(screen.getByLabelText('晚餐')).toHaveValue('白飯 青菜')
-      expect(screen.getByLabelText('午餐')).toHaveValue('')
+      expect(foodsIn('早餐')).toEqual(['豆漿', '蛋餅'])
+      expect(foodsIn('晚餐')).toEqual(['白飯'])
+      expect(screen.getByLabelText('白飯的數量')).toHaveValue(0.5)
+      expect(screen.getByLabelText('白飯的單位')).toHaveValue('碗')
+      expect(screen.getByLabelText('晚餐備註')).toHaveValue('家裡煮')
+      expect(foodsIn('午餐')).toEqual([])
       expect(screen.getByLabelText('體重（kg）')).toHaveValue(null)
       expect(screen.getByLabelText('飲水（ml）')).toHaveValue(null)
       expect(screen.queryByLabelText('時間')).not.toBeInTheDocument()
@@ -315,44 +324,45 @@ describe('EntryForm：快速輸入', () => {
       expect(await getEntry(DATE)).toBeUndefined()
     })
 
-    it('已經打了字的餐別不會被蓋掉', async () => {
+    it('已經有內容的餐別不會被蓋掉', async () => {
       await saveEntry({
         date: '2026-10-28',
         meals: [
-          { type: 'breakfast', description: '昨天的早餐' },
-          { type: 'lunch', description: '昨天的午餐' },
+          { type: 'breakfast', items: [food('昨天的早餐')] },
+          { type: 'lunch', items: [food('昨天的午餐')] },
         ],
         bowel: [],
       })
       const user = userEvent.setup()
       renderForm()
-      await user.type(screen.getByLabelText('早餐'), '今天的早餐')
+      await user.type(screen.getByLabelText('新增食物：早餐'), '今天的早餐{Enter}')
 
       await user.click(copy())
       await waitFor(() =>
         expect(screen.getByRole('status')).toHaveTextContent('已帶入 2026-10-28 的 1 個餐別'),
       )
 
-      expect(screen.getByLabelText('早餐')).toHaveValue('今天的早餐')
-      expect(screen.getByLabelText('午餐')).toHaveValue('昨天的午餐')
+      expect(foodsIn('早餐')).toEqual(['今天的早餐'])
+      expect(foodsIn('午餐')).toEqual(['昨天的午餐'])
     })
 
     it('所有餐別都已有內容時不帶入，並說明原因', async () => {
       await saveEntry({
         date: '2026-10-28',
-        meals: [{ type: 'breakfast', description: '昨天的早餐' }],
+        meals: [{ type: 'breakfast', items: [food('昨天的早餐')] }],
         bowel: [],
       })
       const user = userEvent.setup()
       renderForm()
-      await user.type(screen.getByLabelText('早餐'), '今天的早餐')
+      await user.type(screen.getByLabelText('早餐備註'), '外食')
 
       await user.click(copy())
       await waitFor(() =>
         expect(screen.getByRole('status')).toHaveTextContent('餐點欄位都已有內容，沒有帶入'),
       )
 
-      expect(screen.getByLabelText('早餐')).toHaveValue('今天的早餐')
+      expect(foodsIn('早餐')).toEqual([])
+      expect(screen.getByLabelText('早餐備註')).toHaveValue('外食')
     })
 
     it('前一天沒有紀錄，或只有體重沒有餐點時，說明沒有可帶入的餐點', async () => {
@@ -363,15 +373,13 @@ describe('EntryForm：快速輸入', () => {
       await waitFor(() =>
         expect(screen.getByRole('status')).toHaveTextContent('2026-10-28 沒有餐點紀錄'),
       )
-      expect(screen.getByRole('status')).toHaveTextContent('2026-10-28 沒有餐點紀錄')
 
       await saveEntry({ date: '2026-10-28', weightKg: 68, meals: [], bowel: [] })
       await user.click(copy())
       await waitFor(() =>
         expect(screen.getByRole('status')).toHaveTextContent('2026-10-28 沒有餐點紀錄'),
       )
-      expect(screen.getByRole('status')).toHaveTextContent('2026-10-28 沒有餐點紀錄')
-      expect(screen.getByLabelText('早餐')).toHaveValue('')
+      expect(foodsIn('早餐')).toEqual([])
     })
   })
 })
@@ -643,7 +651,7 @@ describe('EntryForm：體重可能打錯', () => {
     const user = userEvent.setup()
     renderWithPrevious({ ...emptyForm(DATE), weightKg: '700' })
 
-    await user.type(screen.getByLabelText('早餐'), '燕麥')
+    await user.type(screen.getByLabelText('早餐備註'), '燕麥')
     await user.click(screen.getByRole('button', { name: '儲存' }))
 
     await screen.findByText(`已儲存 ${DATE} 的紀錄`)
@@ -662,12 +670,12 @@ describe('EntryForm：草稿', () => {
   it('打字就存成草稿；重新開啟同一天會還原並提示，儲存後草稿清掉', async () => {
     const user = userEvent.setup()
     const { unmount } = renderForm()
-    await user.type(screen.getByLabelText('早餐'), '燕麥')
-    expect(loadDraft(DATE)?.form.meals.breakfast).toBe('燕麥')
+    await user.type(screen.getByLabelText('早餐備註'), '燕麥')
+    expect(loadDraft(DATE)?.form.meals.breakfast.note).toBe('燕麥')
     unmount()
 
     renderForm()
-    expect(screen.getByLabelText('早餐')).toHaveValue('燕麥')
+    expect(screen.getByLabelText('早餐備註')).toHaveValue('燕麥')
     expect(screen.getByRole('region', { name: '還原的草稿' })).toHaveTextContent(
       /已還原 \d{2}:\d{2} 沒儲存的內容/,
     )
@@ -708,14 +716,14 @@ describe('EntryForm：儲存失敗', () => {
     const put = vi.spyOn(db.entries, 'put').mockRejectedValue(new Error('Connection lost'))
     renderForm()
 
-    await user.type(screen.getByLabelText('早餐'), '燕麥')
+    await user.type(screen.getByLabelText('早餐備註'), '燕麥')
     await user.click(screen.getByRole('button', { name: '儲存' }))
 
     expect(
       await screen.findByText('儲存失敗，輸入的內容已存成草稿，請重新整理頁面後再試一次'),
     ).toBeInTheDocument()
-    expect(screen.getByLabelText('早餐')).toHaveValue('燕麥')
-    expect(loadDraft(DATE)?.form.meals.breakfast).toBe('燕麥')
+    expect(screen.getByLabelText('早餐備註')).toHaveValue('燕麥')
+    expect(loadDraft(DATE)?.form.meals.breakfast.note).toBe('燕麥')
     put.mockRestore()
   })
 })
@@ -764,5 +772,111 @@ describe('EntryForm：用藥', () => {
 
     await screen.findByText(`已儲存 ${DATE} 的紀錄`)
     expect((await getEntry(DATE))?.asNeededMedications).toEqual(['普拿疼', '胃藥'])
+  })
+})
+
+describe('EntryForm：餐點的食物', () => {
+  const foodsIn = (meal: string) =>
+    within(screen.getByRole('group', { name: meal }))
+      .queryAllByRole('button', { name: /^移除 / })
+      .map((b) => b.getAttribute('aria-label')!.replace('移除 ', ''))
+  const renderWithFoods = (breakfast: string[]) =>
+    render(
+      <EntryForm
+        initial={emptyForm(DATE)}
+        onDateChange={() => {}}
+        foodsByMeal={{ breakfast, lunch: ['便當'] }}
+      />,
+    )
+
+  it('輸入名稱按 Enter 或「加入」新增一項，預設 1 份；可以改數量、單位，存檔後存成食物項目', async () => {
+    const user = userEvent.setup()
+    renderForm()
+
+    await user.type(screen.getByLabelText('新增食物：早餐'), '燕麥{Enter}')
+    await user.type(screen.getByLabelText('新增食物：早餐'), '白飯')
+    await user.click(screen.getByRole('button', { name: '加入食物：早餐' }))
+    expect(foodsIn('早餐')).toEqual(['燕麥', '白飯'])
+    expect(screen.getByLabelText('燕麥的數量')).toHaveValue(1)
+    expect(screen.getByLabelText('燕麥的單位')).toHaveValue('份')
+    expect(screen.getByLabelText('新增食物：早餐')).toHaveValue('')
+
+    await user.clear(screen.getByLabelText('白飯的數量'))
+    await user.type(screen.getByLabelText('白飯的數量'), '0.5')
+    await user.selectOptions(screen.getByLabelText('白飯的單位'), '碗')
+    await user.type(screen.getByLabelText('早餐備註'), '家裡煮')
+    await user.click(screen.getByRole('button', { name: '移除 燕麥' }))
+    await user.click(screen.getByRole('button', { name: '儲存' }))
+
+    await screen.findByText(`已儲存 ${DATE} 的紀錄`)
+    expect((await getEntry(DATE))?.meals).toEqual([
+      {
+        type: 'breakfast',
+        items: [{ name: '白飯', amount: 0.5, unit: '碗' }],
+        description: '家裡煮',
+      },
+    ])
+  })
+
+  it('常吃的食物只在正在填的那一餐下面列出；點一下加入、再點一下拿掉', async () => {
+    const user = userEvent.setup()
+    renderWithFoods(['燕麥', '香蕉'])
+    expect(screen.queryByRole('group', { name: /^常吃的食物/ })).not.toBeInTheDocument()
+
+    await user.click(screen.getByLabelText('新增食物：早餐'))
+    const chips = screen.getByRole('group', { name: '常吃的食物：早餐' })
+    expect(screen.queryByRole('group', { name: '常吃的食物：午餐' })).not.toBeInTheDocument()
+    await user.click(within(chips).getByRole('button', { name: '香蕉' }))
+    expect(foodsIn('早餐')).toEqual(['香蕉'])
+    expect(within(chips).getByRole('button', { name: '香蕉' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+    await user.click(within(chips).getByRole('button', { name: '香蕉' }))
+    expect(foodsIn('早餐')).toEqual([])
+
+    await user.click(screen.getByLabelText('新增食物：午餐'))
+    expect(screen.queryByRole('group', { name: '常吃的食物：早餐' })).not.toBeInTheDocument()
+    expect(
+      within(screen.getByRole('group', { name: '常吃的食物：午餐' })).getByRole('button', {
+        name: '便當',
+      }),
+    ).toBeInTheDocument()
+  })
+
+  it('先列 12 項，其餘收進「更多」；輸入時篩選，沒有符合的提示直接新增', async () => {
+    const user = userEvent.setup()
+    const many = Array.from({ length: 15 }, (_, i) => `食物${i + 1}`)
+    renderWithFoods([...many, '無糖豆漿'])
+    await user.click(screen.getByLabelText('新增食物：早餐'))
+    const chips = () => screen.getByRole('group', { name: '常吃的食物：早餐' })
+    const names = () =>
+      within(chips())
+        .getAllByRole('button')
+        .map((b) => b.textContent)
+
+    expect(names()).toHaveLength(13)
+    expect(names().at(-1)).toBe('更多（4）')
+    await user.click(within(chips()).getByRole('button', { name: '更多（4）' }))
+    expect(names()).toContain('無糖豆漿')
+    expect(names().at(-1)).toBe('收合')
+
+    await user.type(screen.getByLabelText('新增食物：早餐'), '豆')
+    expect(names()).toEqual(['無糖豆漿'])
+    await user.click(within(chips()).getByRole('button', { name: '無糖豆漿' }))
+    expect(foodsIn('早餐')).toEqual(['無糖豆漿'])
+    expect(screen.getByLabelText('新增食物：早餐')).toHaveValue('')
+
+    await user.type(screen.getByLabelText('新增食物：早餐'), '鳳梨酥')
+    expect(screen.getByText('清單裡沒有「鳳梨酥」，按「加入」直接新增')).toBeInTheDocument()
+  })
+
+  it('存檔時，清單裡沒有的食物自動加進常吃的食物', async () => {
+    const user = userEvent.setup()
+    renderForm()
+    await user.type(screen.getByLabelText('新增食物：晚餐'), '鮭魚{Enter}')
+    await user.click(screen.getByRole('button', { name: '儲存' }))
+    await screen.findByText(`已儲存 ${DATE} 的紀錄`)
+    expect(await db.foods.get('鮭魚')).toBeDefined()
   })
 })

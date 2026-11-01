@@ -6,6 +6,8 @@ import { db } from './db'
 import {
   deleteCondition,
   deleteEntry,
+  addFoods,
+  deleteFood,
   deleteMedication,
   getEntry,
   getLastBackupAt,
@@ -13,6 +15,7 @@ import {
   importBackup,
   listConditions,
   listEntries,
+  listFoods,
   listMedications,
   recordBackup,
   saveCondition,
@@ -42,6 +45,7 @@ beforeEach(async () => {
     db.profile.clear(),
     db.meta.clear(),
     db.medications.clear(),
+    db.foods.clear(),
   ])
 })
 
@@ -141,9 +145,9 @@ describe('症狀項目與資料庫升版', () => {
     expect((await getEntry('2026-10-28'))?.symptomItems).toEqual(symptomItems)
   })
 
-  it('資料庫版本是 6（v6 新增固定用藥資料表與紀錄的用藥欄位）', () => {
+  it('資料庫版本是 7（v6 新增固定用藥，v7 新增常吃的食物清單）', () => {
     // Dexie 內部版本是宣告的 10 倍；verno 回傳宣告的版本
-    expect(db.verno).toBe(6)
+    expect(db.verno).toBe(7)
   })
 
   it('v2 時代存的舊資料升版後仍在，沒有症狀項目', async () => {
@@ -205,5 +209,66 @@ describe('固定用藥', () => {
       medications: [{ id: 'c', name: '鈣片', startDate: '2026-11-01' }],
     })
     expect((await listMedications()).map((m) => m.id)).toEqual(['a', 'c'])
+  })
+})
+
+describe('常吃的食物', () => {
+  it('依加入順序列出；已在清單的略過並回報實際新增幾項；可以刪除', async () => {
+    expect(await addFoods(['燕麥', '香蕉'])).toBe(2)
+    expect(await addFoods(['香蕉', '地瓜'])).toBe(1)
+    expect(await listFoods()).toEqual(['燕麥', '香蕉', '地瓜'])
+
+    await deleteFood('香蕉')
+    expect(await listFoods()).toEqual(['燕麥', '地瓜'])
+  })
+
+  it('匯入備份時合併食物清單，不重複', async () => {
+    await addFoods(['燕麥'])
+    await importBackup({ entries: [], conditions: [], foods: ['燕麥', '雞胸肉'] })
+    expect(await listFoods()).toEqual(['燕麥', '雞胸肉'])
+  })
+})
+
+describe('升到 v7：舊的文字餐點自動拆成食物', () => {
+  it('v6 時代整段文字的餐點，升版後變成一項項的食物，地點移到備註', async () => {
+    db.close()
+    await Dexie.delete('health-diary')
+    const old = new Dexie('health-diary')
+    old.version(6).stores({
+      entries: 'date',
+      conditions: 'id',
+      profile: 'id',
+      meta: 'key',
+      medications: 'id',
+    })
+    await old.table('entries').put({
+      date: '2026-10-28',
+      meals: [
+        { type: 'lunch', description: '外食：蒸餃x9 魯肉飯小' },
+        { type: 'dinner', description: '白飯1碗 青菜一碗' },
+      ],
+      bowel: [],
+    })
+    old.close()
+
+    await db.open()
+
+    expect((await getEntry('2026-10-28'))?.meals).toEqual([
+      {
+        type: 'lunch',
+        items: [
+          { name: '蒸餃', amount: 9, unit: '份' },
+          { name: '魯肉飯（小）', amount: 1, unit: '份' },
+        ],
+        description: '外食',
+      },
+      {
+        type: 'dinner',
+        items: [
+          { name: '白飯', amount: 1, unit: '碗' },
+          { name: '青菜', amount: 1, unit: '碗' },
+        ],
+      },
+    ])
   })
 })

@@ -2,6 +2,7 @@ import {
   getProfile,
   listConditions,
   listEntries,
+  listFoods,
   listMedications,
   recordBackup,
 } from '@/data/repository'
@@ -38,6 +39,7 @@ export async function exportBackup(now: Date = new Date()): Promise<ExportResult
     entries: await listEntries(),
     conditions: await listConditions(),
     medications: await listMedications(),
+    foods: await listFoods(),
     profile: await getProfile(),
   }
   const file = new File([serializeBackup(data, now)], `health-diary-${toDateString(now)}.json`, {

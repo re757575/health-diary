@@ -38,7 +38,12 @@ describe('備份匯出入', () => {
       conditions: [condition],
       profile: { birthday: '1990-05-20', heightCm: 175, sex: 'male' as const },
     }
-    expect(parseBackup(serializeBackup(data))).toEqual({ ok: true, medications: [], ...data })
+    expect(parseBackup(serializeBackup(data))).toEqual({
+      ok: true,
+      medications: [],
+      foods: [],
+      ...data,
+    })
   })
 
   it('相容 v2 備份：紀錄沒有症狀項目也能匯入，內容原樣保留', () => {
@@ -68,8 +73,8 @@ describe('備份匯出入', () => {
     }
     const text = serializeBackup(data)
     expect(JSON.parse(text).version).toBe(BACKUP_VERSION)
-    expect(BACKUP_VERSION).toBe(5)
-    expect(parseBackup(text)).toEqual({ ok: true, medications: [], ...data })
+    expect(BACKUP_VERSION).toBe(6)
+    expect(parseBackup(text)).toEqual({ ok: true, medications: [], foods: [], ...data })
   })
 
   it('沒有填基本資料時，匯入後 profile 為 undefined（不會蓋掉現有的）', () => {
@@ -216,5 +221,55 @@ describe('備份：固定用藥', () => {
       conditions: [],
     })
     expect(parseBackup(v4)).toMatchObject({ ok: true, medications: [] })
+  })
+})
+
+describe('備份：常吃的食物', () => {
+  it('食物清單會匯出再匯入；v5 以前的備份沒有清單，視為空的', () => {
+    const foods = ['燕麥', '無糖豆漿']
+    expect(parseBackup(serializeBackup({ entries: [], conditions: [], foods }))).toMatchObject({
+      ok: true,
+      foods,
+    })
+    const v5 = JSON.stringify({
+      app: 'health-diary',
+      version: 5,
+      exportedAt: '2026-11-01T00:00:00.000Z',
+      entries: [],
+      conditions: [],
+      medications: [],
+    })
+    expect(parseBackup(v5)).toMatchObject({ ok: true, foods: [] })
+  })
+})
+
+describe('備份：舊版的文字餐點', () => {
+  const backupWith = (version: number, description: string) =>
+    JSON.stringify({
+      app: 'health-diary',
+      version,
+      exportedAt: '2026-11-01T00:00:00.000Z',
+      entries: [{ date: '2026-10-28', meals: [{ type: 'breakfast', description }], bowel: [] }],
+      conditions: [],
+    })
+
+  it('v6 以前的備份匯入時把文字餐點拆成食物', () => {
+    const parsed = parseBackup(backupWith(5, '豆漿 鮪魚蛋餅'))
+    expect(parsed.ok && parsed.entries[0]!.meals).toEqual([
+      {
+        type: 'breakfast',
+        items: [
+          { name: '豆漿', amount: 1, unit: '份' },
+          { name: '鮪魚蛋餅', amount: 1, unit: '份' },
+        ],
+      },
+    ])
+  })
+
+  it('v6 的備份裡只有備註的餐點是刻意的，不拆', () => {
+    const parsed = parseBackup(backupWith(6, '外食 早餐店'))
+    expect(parsed.ok && parsed.entries[0]!.meals).toEqual([
+      { type: 'breakfast', description: '外食 早餐店' },
+    ])
   })
 })

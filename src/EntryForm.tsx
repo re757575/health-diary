@@ -12,7 +12,7 @@ import {
 } from '@mantine/core'
 import { useEffect, useId, useState, type FormEvent } from 'react'
 import { clearDraft, loadDraft, saveDraft, type Draft } from '@/data/draft'
-import { getEntry, saveEntry } from '@/data/repository'
+import { addFoods, getEntry, saveEntry } from '@/data/repository'
 import {
   BRISTOL_DESCRIPTIONS,
   LONG_SLEEP_HOURS,
@@ -29,6 +29,7 @@ import {
   emptyForm,
   entryToForm,
   fillEmptyMeals,
+  isEmptyMeal,
   formToEntry,
   isSameEntry,
   shiftDate,
@@ -45,6 +46,7 @@ import { PRESET_SYMPTOMS } from '@/domain/symptom'
 import type { Medication } from '@/domain/medication'
 import { PRESET_TAGS, addTag, toggleTag } from '@/domain/tag'
 import { ChipChoices } from './ChipChoices'
+import { MealEditor } from './MealEditor'
 import { isSuspectWeight, type DayWeight } from '@/domain/weight'
 import { useStatus } from './useStatus'
 
@@ -62,15 +64,18 @@ interface Props {
   medications?: readonly Medication[]
   /** 臨時用藥的候選清單（過去用過的） */
   knownAsNeeded?: readonly string[]
+  /** 常吃的食物，依各餐吃過的次數排序；三餐可以直接點選 */
+  foodsByMeal?: Partial<Record<MealType, readonly string[]>>
   /** 這天之前最近一次量的體重；體重沒填時沿用它，顯示在欄位提示 */
   previousWeight?: DayWeight
 }
 
-const MEAL_PLACEHOLDERS: Record<MealType, string> = {
-  breakfast: '例如：燕麥奶加香蕉',
-  lunch: '例如：雞腿便當、青菜',
-  dinner: '例如：燙青菜、豆腐、白飯半碗',
-  snack: '例如：無糖豆漿、堅果',
+/** 各餐備註的提示：寫在哪裡吃、怎麼煮這類食物清單表達不了的事 */
+const MEAL_NOTE_PLACEHOLDERS: Record<MealType, string> = {
+  breakfast: '備註，例如：早餐店',
+  lunch: '備註，例如：外食、便當',
+  dinner: '備註，例如：家裡煮',
+  snack: '備註，例如：下午茶',
 }
 
 const emptyMeals = emptyForm('').meals
@@ -86,8 +91,11 @@ export function EntryForm({
   previousWeight,
   medications = [],
   knownAsNeeded = [],
+  foodsByMeal = {},
 }: Props) {
   const medicationsLabelId = useId()
+  // 正在填的餐別；常吃的食物只列在這一餐下面
+  const [activeMeal, setActiveMeal] = useState<MealType | null>(null)
   // 上次沒儲存就離開（例如切到別的 App 被系統關掉）的內容；和已存的不同才還原。
   // 合併空表單是為了補上舊版草稿沒有的欄位
   const [restored, setRestored] = useState<Draft | undefined>(() => {
@@ -171,7 +179,7 @@ export function EntryForm({
     const previous = await getEntry(previousDate)
     const source = previous && entryToForm(previous).meals
     const { meals, filled } = fillEmptyMeals(form.meals, source ?? emptyMeals)
-    if (!source || Object.values(source).every((text) => text.trim() === '')) {
+    if (!source || Object.values(source).every(isEmptyMeal)) {
       setStatus(`${previousDate} 沒有餐點紀錄`)
     } else if (filled === 0) {
       setStatus('餐點欄位都已有內容，沒有帶入')
@@ -203,6 +211,8 @@ export function EntryForm({
     // 失敗時輸入還在畫面上，也已經存成草稿，重新整理後會還原
     await tryWrite(async () => {
       await saveEntry(parsed.data)
+      // 第一次吃的食物自動加進常吃清單，之後就能直接點選
+      await addFoods(parsed.data.meals.flatMap((m) => m.items?.map((i) => i.name) ?? []))
       setRestored(undefined)
       setStatus(`已儲存 ${parsed.data.date} 的紀錄`)
     }, '儲存失敗，輸入的內容已存成草稿')
@@ -384,13 +394,15 @@ export function EntryForm({
           複製前一天的餐點
         </Button>
         {MEAL_TYPES.map((type) => (
-          <Textarea
+          <MealEditor
             key={type}
             label={MEAL_LABELS[type]}
-            placeholder={MEAL_PLACEHOLDERS[type]}
-            rows={2}
             value={form.meals[type]}
-            onChange={(e) => set('meals', { ...form.meals, [type]: e.target.value })}
+            onChange={(meal) => set('meals', { ...form.meals, [type]: meal })}
+            foods={foodsByMeal[type] ?? []}
+            active={activeMeal === type}
+            onActivate={() => setActiveMeal(type)}
+            notePlaceholder={MEAL_NOTE_PLACEHOLDERS[type]}
           />
         ))}
 

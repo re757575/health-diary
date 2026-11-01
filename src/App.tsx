@@ -7,11 +7,14 @@ import {
   getLastBackupAt,
   getProfile,
   listEntries,
+  listFoods,
   listMedications,
 } from '@/data/repository'
 import { backupStatus } from '@/domain/backup'
 import { emptyForm, entryToForm, shiftDate, toDateString } from '@/domain/form'
 import { collectSymptomNames } from '@/domain/symptom'
+import { MEAL_TYPES } from '@/domain/entry'
+import { sortFoodsByUsage } from '@/domain/food'
 import { activeMedications, collectAsNeededNames } from '@/domain/medication'
 import { collectTagNames } from '@/domain/tag'
 import { weightOn } from '@/domain/weight'
@@ -22,6 +25,7 @@ import { DataTools } from './DataTools'
 import { findIncompleteDays } from '@/domain/quality'
 import { EntryForm } from './EntryForm'
 import { HistoryList } from './HistoryList'
+import { Foods } from './Foods'
 import { Medications } from './Medications'
 import { MissingNotice } from './MissingNotice'
 import { ProfileForm } from './ProfileForm'
@@ -44,6 +48,15 @@ export default function App() {
   const tagNames = useMemo(() => collectTagNames(history ?? []), [history])
   const asNeededNames = useMemo(() => collectAsNeededNames(history ?? []), [history])
   const medications = useLiveQuery(listMedications, [])
+  const foodList = useLiveQuery(listFoods, [])
+  // 每一餐依那一餐吃過的次數排序，早餐常吃的不一定是晚餐常吃的
+  const foodsByMeal = useMemo(
+    () =>
+      Object.fromEntries(
+        MEAL_TYPES.map((type) => [type, sortFoodsByUsage(foodList ?? [], history ?? [], type)]),
+      ),
+    [foodList, history],
+  )
   const todaysMedications = useMemo(
     () => activeMedications(medications ?? [], date),
     [medications, date],
@@ -165,6 +178,7 @@ export default function App() {
                   previousWeight={previousWeight}
                   medications={todaysMedications}
                   knownAsNeeded={asNeededNames}
+                  foodsByMeal={foodsByMeal}
                 />
               )}
             </Section>
@@ -186,6 +200,8 @@ export default function App() {
             <Conditions />
 
             <Medications />
+
+            <Foods />
 
             <Section title="基本資料">{profile && <ProfileForm initial={profile.value} />}</Section>
 

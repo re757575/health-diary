@@ -3,7 +3,7 @@ import type { Condition } from '@/domain/condition'
 import type { Entry } from '@/domain/entry'
 import type { Medication } from '@/domain/medication'
 import type { Profile } from '@/domain/profile'
-import { PROFILE_ID, db } from './db'
+import { PROFILE_ID, db, type StoredFood } from './db'
 
 /** 全部紀錄，日期由新到舊 */
 export async function listEntries(): Promise<Entry[]> {
@@ -55,6 +55,35 @@ export async function deleteMedication(id: string): Promise<void> {
   await db.medications.delete(id)
 }
 
+/** 常吃的食物清單，依加入的順序 */
+export async function listFoods(): Promise<string[]> {
+  const foods = await db.foods.toArray()
+  return foods.sort((a, b) => a.addedAt.localeCompare(b.addedAt)).map((f) => f.name)
+}
+
+/**
+ * 加入食物；已經在清單裡的略過（不改變原本的順序）。回傳實際新增了幾項。
+ * 同一批的 addedAt 依序遞增，之後列出時維持匯入的順序
+ */
+export async function addFoods(names: string[], now: Date = new Date()): Promise<number> {
+  return db.transaction('rw', db.foods, async () => {
+    const stored = await db.foods.toArray()
+    const existing = new Set(stored.map((f) => f.name))
+    // 接在清單最後：同一毫秒內連續加入時，不能排到前一批的前面
+    const last = Math.max(0, ...stored.map((f) => Date.parse(f.addedAt)))
+    const start = Math.max(now.getTime(), last + 1)
+    const added: StoredFood[] = names
+      .filter((name) => !existing.has(name))
+      .map((name, i) => ({ name, addedAt: new Date(start + i).toISOString() }))
+    await db.foods.bulkAdd(added)
+    return added.length
+  })
+}
+
+export async function deleteFood(name: string): Promise<void> {
+  await db.foods.delete(name)
+}
+
 export async function getProfile(): Promise<Profile | undefined> {
   const stored = await db.profile.get(PROFILE_ID)
   if (!stored) return undefined
@@ -76,14 +105,20 @@ export async function importBackup({
   entries,
   conditions,
   medications = [],
+  foods = [],
   profile,
 }: BackupData): Promise<void> {
-  await db.transaction('rw', [db.entries, db.conditions, db.medications, db.profile], async () => {
-    await db.entries.bulkPut(entries)
-    await db.conditions.bulkPut(conditions)
-    await db.medications.bulkPut(medications)
-    if (profile) await db.profile.put({ ...profile, id: PROFILE_ID })
-  })
+  await db.transaction(
+    'rw',
+    [db.entries, db.conditions, db.medications, db.foods, db.profile],
+    async () => {
+      await db.entries.bulkPut(entries)
+      await db.conditions.bulkPut(conditions)
+      await db.medications.bulkPut(medications)
+      await addFoods(foods)
+      if (profile) await db.profile.put({ ...profile, id: PROFILE_ID })
+    },
+  )
 }
 
 const LAST_BACKUP_KEY = 'lastBackupAt'

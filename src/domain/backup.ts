@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { conditionSchema, type Condition } from './condition'
 import { entrySchema, type Entry } from './entry'
+import { convertLegacyMeal } from './legacy-meal'
 import { medicationSchema, type Medication } from './medication'
 import { toDateString } from './form'
 import { profileSchema, type Profile } from './profile'
@@ -9,20 +10,30 @@ import { daysBetween } from './trend'
 export const BACKUP_APP = 'health-diary'
 /**
  * v1 只有 entries；v2 新增 conditions 與 profile；v3 的紀錄多了 symptomItems（症狀與嚴重程度）、exerciseMinutes 與 tags；
- * v4 的紀錄多了 noBowel（確認當天沒有排便）；v5 新增 medications（固定用藥），紀錄多了 missedMedications 與 asNeededMedications。
+ * v4 的紀錄多了 noBowel（確認當天沒有排便）；v5 新增 medications（固定用藥），紀錄多了 missedMedications 與 asNeededMedications；
+ * v6 新增 foods（常吃的食物清單），餐點改成一項項的食物與份量（舊版的文字餐點匯入時會自動拆開）。
  * 匯入時各版本都接受：舊備份沒有的欄位都是選填
  */
-export const BACKUP_VERSION = 5
+export const BACKUP_VERSION = 6
 
 const backupSchema = z.object({
   app: z.literal(BACKUP_APP),
-  version: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4), z.literal(5)]),
+  version: z.union([
+    z.literal(1),
+    z.literal(2),
+    z.literal(3),
+    z.literal(4),
+    z.literal(5),
+    z.literal(6),
+  ]),
   exportedAt: z.string(),
   entries: z.array(entrySchema),
   // 以下欄位 v1 備份沒有
   conditions: z.array(conditionSchema).default([]),
   // v5 之前的備份沒有
   medications: z.array(medicationSchema).default([]),
+  // v6 之前的備份沒有
+  foods: z.array(z.string().trim().min(1)).default([]),
   profile: profileSchema.optional(),
 })
 
@@ -31,12 +42,14 @@ export interface BackupData {
   conditions: Condition[]
   /** 固定用藥；沒給視為沒有 */
   medications?: Medication[]
+  /** 常吃的食物清單；沒給視為沒有 */
+  foods?: string[]
   profile?: Profile
 }
 
 /** 序列化成可下載的備份 JSON，紀錄依日期由舊到新排序 */
 export function serializeBackup(
-  { entries, conditions, medications = [], profile }: BackupData,
+  { entries, conditions, medications = [], foods = [], profile }: BackupData,
   now: Date = new Date(),
 ): string {
   const sorted = [...entries].sort((a, b) => a.date.localeCompare(b.date))
@@ -48,6 +61,7 @@ export function serializeBackup(
       entries: sorted,
       conditions,
       medications,
+      foods,
       profile,
     },
     null,
@@ -69,8 +83,13 @@ export function parseBackup(text: string): ParseBackupResult {
   if (!result.success) {
     return { ok: false, error: '檔案格式不符，不是本 App 匯出的備份檔' }
   }
-  const { entries, conditions, medications, profile } = result.data
-  return { ok: true, entries, conditions, medications, profile }
+  const { version, conditions, medications, foods, profile } = result.data
+  // v6 之前的餐點是整段文字，拆成一項項的食物；v6 之後只有備註的餐點是刻意的，不能再拆
+  const entries =
+    version < 6
+      ? result.data.entries.map((e) => ({ ...e, meals: e.meals.map(convertLegacyMeal) }))
+      : result.data.entries
+  return { ok: true, entries, conditions, medications, foods, profile }
 }
 
 export interface ImportPreview {

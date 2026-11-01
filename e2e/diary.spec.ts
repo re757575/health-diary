@@ -3,13 +3,24 @@ import { expect, test, type Page } from '@playwright/test'
 const openTab = (page: Page, name: '今天' | '趨勢' | '設定') =>
   page.getByRole('tab', { name }).click()
 
+/** 在某一餐輸入食物名稱並加入（預設 1 份） */
+async function addFood(page: Page, meal: '早餐' | '午餐' | '晚餐', name: string) {
+  await page.getByLabel(`新增食物：${meal}`).fill(name)
+  await page.getByLabel(`新增食物：${meal}`).press('Enter')
+}
+
+/** 某一餐目前列出的某項食物（用移除按鈕定位，名稱是唯一的） */
+const foodRow = (page: Page, meal: string, name: string) =>
+  page.getByRole('group', { name: meal, exact: true }).getByRole('button', { name: `移除 ${name}` })
+
 test('記錄一天 → 重新整理仍在 → 產生 AI 提示詞', async ({ page }) => {
   await page.goto('./')
 
   await page.getByLabel('體重（kg）').fill('70.5')
   await page.getByLabel('入睡時間').fill('23:30')
   await page.getByLabel('起床時間').fill('07:00')
-  await page.getByLabel('早餐').fill('燕麥奶加香蕉')
+  await addFood(page, '早餐', '燕麥奶')
+  await addFood(page, '早餐', '香蕉')
   await page
     .getByRole('group', { name: '睡眠品質（1–5）' })
     .getByRole('button', { name: '4' })
@@ -30,7 +41,8 @@ test('記錄一天 → 重新整理仍在 → 產生 AI 提示詞', async ({ pag
 
   // 資料存在裝置上：重新整理後仍在
   await page.reload()
-  await expect(page.getByLabel('早餐')).toHaveValue('燕麥奶加香蕉')
+  await expect(foodRow(page, '早餐', '燕麥奶')).toBeVisible()
+  await expect(foodRow(page, '早餐', '香蕉')).toBeVisible()
   // 評分按鈕：重新整理後仍是選取狀態，再點一次可取消
   const mood = page
     .getByRole('group', { name: '心情／精神（1–5）' })
@@ -48,7 +60,7 @@ test('記錄一天 → 重新整理仍在 → 產生 AI 提示詞', async ({ pag
   await page.getByRole('button', { name: '產生 AI 提示詞' }).click()
   const prompt = page.getByLabel('提示詞')
   await expect(prompt).toContainText('體重：70.5 kg')
-  await expect(prompt).toContainText('早餐：燕麥奶加香蕉')
+  await expect(prompt).toContainText('早餐：燕麥奶 1 份、香蕉 1 份')
   await expect(prompt).toContainText('布里斯托 4 型')
   // 重新整理後取消的是畫面上的選取，已儲存的紀錄不受影響
   await expect(prompt).toContainText('品質 4/5')
@@ -245,8 +257,9 @@ test('快速輸入：飲水 +250、時間「現在」按鈕、複製前一天的
   await page.getByRole('button', { name: '填入現在時刻：第 1 次排便' }).click()
   await expect(page.getByLabel('時間', { exact: true })).toHaveValue(/^\d{2}:\d{2}$/)
 
-  await page.getByLabel('早餐').fill('豆漿 蛋餅')
-  await page.getByLabel('午餐').fill('雞腿便當')
+  await addFood(page, '早餐', '豆漿')
+  await addFood(page, '早餐', '蛋餅')
+  await addFood(page, '午餐', '雞腿便當')
   await page.getByLabel('體重（kg）').fill('68')
   await page.getByRole('button', { name: '儲存', exact: true }).click()
   await expect(page.getByText(/已儲存 \d{4}-\d{2}-\d{2} 的紀錄/)).toBeVisible()
@@ -255,12 +268,14 @@ test('快速輸入：飲水 +250、時間「現在」按鈕、複製前一天的
   // 隔天的表單是空的；複製前一天只帶餐點，體重、飲水、排便不帶，也還沒儲存
   await page.getByRole('button', { name: '後一天', exact: true }).click()
   await expect(page.getByLabel('日期', { exact: true })).not.toHaveValue(saved)
-  await expect(page.getByLabel('早餐')).toHaveValue('')
-  await page.getByLabel('午餐').fill('自己打的午餐')
+  await expect(foodRow(page, '早餐', '豆漿')).toHaveCount(0)
+  await addFood(page, '午餐', '自己做的午餐')
   await page.getByRole('button', { name: '複製前一天的餐點' }).click()
   await expect(page.getByRole('status')).toContainText(`已帶入 ${saved} 的 1 個餐別`)
-  await expect(page.getByLabel('早餐')).toHaveValue('豆漿 蛋餅')
-  await expect(page.getByLabel('午餐')).toHaveValue('自己打的午餐')
+  await expect(foodRow(page, '早餐', '豆漿')).toBeVisible()
+  await expect(foodRow(page, '早餐', '蛋餅')).toBeVisible()
+  await expect(foodRow(page, '午餐', '自己做的午餐')).toBeVisible()
+  await expect(foodRow(page, '午餐', '雞腿便當')).toHaveCount(0)
   await expect(page.getByLabel('體重（kg）')).toHaveValue('')
   await expect(page.getByLabel('飲水（ml）')).toHaveValue('')
   await expect(page.getByRole('button', { name: /^填入現在時刻：第/ })).toHaveCount(0)
@@ -270,8 +285,8 @@ test('快速輸入：飲水 +250、時間「現在」按鈕、複製前一天的
   await expect(page.getByText(/已儲存 \d{4}-\d{2}-\d{2} 的紀錄/)).toBeVisible()
   await page.reload()
   await page.getByRole('button', { name: '後一天', exact: true }).click()
-  await expect(page.getByLabel('早餐')).toHaveValue('豆漿 蛋餅')
-  await expect(page.getByLabel('午餐')).toHaveValue('自己打的午餐')
+  await expect(foodRow(page, '早餐', '豆漿')).toBeVisible()
+  await expect(foodRow(page, '午餐', '自己做的午餐')).toBeVisible()
 })
 
 test('症狀：點選＋輕中重 → 自訂症狀 → 趨勢頁出現天數 → 隔天清單有自訂症狀 → 進 AI 提示詞', async ({
@@ -526,7 +541,8 @@ test('可安裝的 PWA：有 manifest 與圖示，service worker 接手後離線
 
 test('草稿：沒儲存就被關掉（重新整理），再開啟時還原；捨棄後回到空白', async ({ page }) => {
   await page.goto('./')
-  await page.getByLabel('早餐').fill('燕麥奶加香蕉')
+  await addFood(page, '早餐', '燕麥奶')
+  await page.getByLabel('早餐備註').fill('早餐店')
   await page.getByLabel('體重（kg）').fill('70')
 
   // 模擬切到別的 App 時被系統關掉：直接重新載入，不經過儲存
@@ -536,14 +552,15 @@ test('草稿：沒儲存就被關掉（重新整理），再開啟時還原；�
   await expect(page.getByRole('region', { name: '還原的草稿' })).toContainText(
     /已還原 \d{2}:\d{2} 沒儲存的內容/,
   )
-  await expect(page.getByLabel('早餐')).toHaveValue('燕麥奶加香蕉')
+  await expect(foodRow(page, '早餐', '燕麥奶')).toBeVisible()
+  await expect(page.getByLabel('早餐備註')).toHaveValue('早餐店')
   await expect(page.getByLabel('體重（kg）')).toHaveValue('70')
 
   await page.getByRole('button', { name: '捨棄' }).click()
-  await expect(page.getByLabel('早餐')).toHaveValue('')
+  await expect(foodRow(page, '早餐', '燕麥奶')).toHaveCount(0)
   await page.reload()
   await expect(page.getByRole('region', { name: '還原的草稿' })).toHaveCount(0)
-  await expect(page.getByLabel('早餐')).toHaveValue('')
+  await expect(page.getByLabel('早餐備註')).toHaveValue('')
 })
 
 test('用藥：設定登記固定用藥 → 每日預設有吃、標沒吃、加臨時用藥 → 進 AI 提示詞', async ({
@@ -586,4 +603,64 @@ test('用藥：設定登記固定用藥 → 每日預設有吃、標沒吃、加
   await expect(page.getByRole('figure', { name: '固定用藥' })).toContainText(
     '服藥 0／1 天（沒吃 1 天）',
   )
+})
+
+test('常吃的食物：匯入清單 → 早餐直接點選 → 存檔後進 AI 提示詞', async ({ page }) => {
+  await page.goto('./')
+  await openTab(page, '設定')
+  const foods = page.getByRole('region', { name: '常吃的食物' })
+  await foods.getByLabel('貼上食物清單').fill('燕麥\n香蕉\n無糖豆漿')
+  await foods.getByRole('button', { name: '匯入清單' }).click()
+  await expect(foods.getByText('已加入 3 項')).toBeVisible()
+
+  await openTab(page, '今天')
+  await page.getByLabel('新增食物：早餐').click()
+  const chips = page.getByRole('group', { name: '常吃的食物：早餐' })
+  await chips.getByRole('button', { name: '燕麥' }).click()
+  await chips.getByRole('button', { name: '無糖豆漿' }).click()
+  await expect(foodRow(page, '早餐', '燕麥')).toBeVisible()
+  await page.getByLabel('無糖豆漿的單位').selectOption('杯')
+  await page.getByRole('button', { name: '儲存', exact: true }).click()
+  await expect(page.getByText(/已儲存 \d{4}-\d{2}-\d{2} 的紀錄/)).toBeVisible()
+
+  await openTab(page, '設定')
+  await page.getByRole('button', { name: '產生 AI 提示詞' }).click()
+  await expect(page.getByLabel('提示詞')).toContainText('早餐：燕麥 1 份、無糖豆漿 1 杯')
+})
+
+test('匯入舊版備份：整段文字的餐點自動拆成一項項的食物，地點移到備註', async ({ page }) => {
+  const today = await page.evaluate(() => {
+    const d = new Date()
+    const pad = (n: number) => String(n).padStart(2, '0')
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+  })
+  const backup = {
+    app: 'health-diary',
+    version: 5,
+    exportedAt: new Date().toISOString(),
+    conditions: [],
+    entries: [
+      {
+        date: today,
+        meals: [{ type: 'lunch', description: '外食：蒸餃x9 魯肉飯小 白飯1碗' }],
+        bowel: [],
+      },
+    ],
+  }
+
+  await page.goto('./')
+  await openTab(page, '設定')
+  await page.getByLabel('匯入備份').setInputFiles({
+    name: 'old.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(backup)),
+  })
+  await expect(page.getByText('已匯入 1 筆紀錄')).toBeVisible()
+
+  await openTab(page, '今天')
+  await expect(foodRow(page, '午餐', '蒸餃')).toBeVisible()
+  await expect(page.getByLabel('蒸餃的數量')).toHaveValue('9')
+  await expect(page.getByLabel('白飯的單位')).toHaveValue('碗')
+  await expect(foodRow(page, '午餐', '魯肉飯（小）')).toBeVisible()
+  await expect(page.getByLabel('午餐備註')).toHaveValue('外食')
 })

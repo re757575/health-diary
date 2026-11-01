@@ -1,6 +1,7 @@
 import Dexie, { type EntityTable } from 'dexie'
 import type { Condition } from '@/domain/condition'
 import type { Entry } from '@/domain/entry'
+import { convertLegacyMeal } from '@/domain/legacy-meal'
 import type { Medication } from '@/domain/medication'
 import type { Profile } from '@/domain/profile'
 
@@ -8,6 +9,12 @@ import type { Profile } from '@/domain/profile'
 export const PROFILE_ID = 'me'
 
 export type StoredProfile = Profile & { id: typeof PROFILE_ID }
+
+/** 常吃的食物清單裡的一項；addedAt 用來維持匯入時的順序 */
+export interface StoredFood {
+  name: string
+  addedAt: string
+}
 
 /** App 自己的狀態（例如上次備份的時間），不是健康資料，不放進備份檔 */
 export interface Meta {
@@ -21,6 +28,7 @@ class HealthDiaryDb extends Dexie {
   profile!: EntityTable<StoredProfile, 'id'>
   meta!: EntityTable<Meta, 'key'>
   medications!: EntityTable<Medication, 'id'>
+  foods!: EntityTable<StoredFood, 'name'>
 
   constructor() {
     super('health-diary')
@@ -44,6 +52,25 @@ class HealthDiaryDb extends Dexie {
       meta: 'key',
       medications: 'id',
     })
+    // v7：新增常吃的食物清單（foods）；餐點從整段文字改成一項項的食物與份量（items），
+    // 舊紀錄的文字在升版時拆成食物，地點等說明移到備註（description）
+    this.version(7)
+      .stores({
+        entries: 'date',
+        conditions: 'id',
+        profile: 'id',
+        meta: 'key',
+        medications: 'id',
+        foods: 'name',
+      })
+      .upgrade((tx) =>
+        tx
+          .table<Entry>('entries')
+          .toCollection()
+          .modify((entry) => {
+            entry.meals = entry.meals.map(convertLegacyMeal)
+          }),
+      )
   }
 }
 

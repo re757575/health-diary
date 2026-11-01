@@ -44,9 +44,10 @@ function formatEntry(entry: Entry, history: Entry[], medicationNames: Map<string
   }
 
   for (const meal of entry.meals) {
-    if (meal.description.trim()) {
-      lines.push(`- ${MEAL_LABELS[meal.type]}：${meal.description.trim()}`)
-    }
+    // 「燕麥 1 份、白飯 0.5 碗；外食」：食物與份量在前，備註在後
+    const foods = (meal.items ?? []).map((i) => `${i.name} ${i.amount} ${i.unit}`).join('、')
+    const text = [foods, meal.description?.trim()].filter(Boolean).join('；')
+    if (text) lines.push(`- ${MEAL_LABELS[meal.type]}：${text}`)
   }
 
   if (entry.waterMl !== undefined) lines.push(`- 飲水：${entry.waterMl} ml`)
