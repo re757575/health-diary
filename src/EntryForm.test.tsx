@@ -818,6 +818,45 @@ describe('EntryForm：餐點的食物', () => {
     ])
   })
 
+  it('已加入的食物可以改名稱，改完存檔的是新名稱，份量不變', async () => {
+    const user = userEvent.setup()
+    renderForm()
+
+    await user.type(screen.getByLabelText('新增食物：早餐'), '燕麥{Enter}')
+    await user.type(screen.getByLabelText('新增食物：早餐'), '香蕉{Enter}')
+    await user.clear(screen.getByLabelText('燕麥的數量'))
+    await user.type(screen.getByLabelText('燕麥的數量'), '2')
+
+    // 輸入途中名稱欄位維持同一個、不會失去焦點
+    const name = screen.getByLabelText('早餐第 1 項的名稱')
+    await user.clear(name)
+    await user.type(name, '燕麥粥')
+    expect(name).toHaveFocus()
+    expect(foodsIn('早餐')).toEqual(['燕麥粥', '香蕉'])
+
+    await user.click(screen.getByRole('button', { name: '儲存' }))
+    await screen.findByText(`已儲存 ${DATE} 的紀錄`)
+    expect((await getEntry(DATE))?.meals[0]?.items).toEqual([
+      { name: '燕麥粥', amount: 2, unit: '份' },
+      { name: '香蕉', amount: 1, unit: '份' },
+    ])
+  })
+
+  it('名稱清空的食物存檔時略過', async () => {
+    const user = userEvent.setup()
+    renderForm()
+
+    await user.type(screen.getByLabelText('新增食物：早餐'), '燕麥{Enter}')
+    await user.type(screen.getByLabelText('新增食物：早餐'), '香蕉{Enter}')
+    await user.clear(screen.getByLabelText('早餐第 1 項的名稱'))
+    await user.click(screen.getByRole('button', { name: '儲存' }))
+
+    await screen.findByText(`已儲存 ${DATE} 的紀錄`)
+    expect((await getEntry(DATE))?.meals[0]?.items).toEqual([
+      { name: '香蕉', amount: 1, unit: '份' },
+    ])
+  })
+
   it('常吃的食物只在正在填的那一餐下面列出；點一下加入、再點一下拿掉', async () => {
     const user = userEvent.setup()
     renderWithFoods(['燕麥', '香蕉'])
@@ -888,5 +927,168 @@ describe('EntryForm：餐點的食物', () => {
     await screen.findByText(`已儲存 ${DATE} 的紀錄`)
     expect((await getEntry(DATE))?.meals[0]?.items?.[0]?.name).toBe('Big Mac')
     expect(await db.foods.count()).toBe(0)
+  })
+})
+
+describe('EntryForm：用照片辨識食物', () => {
+  const REPLY = JSON.stringify({
+    items: [
+      { name: '燕麥粥', amount: 1, unit: '碗' },
+      { name: '水煮蛋', amount: 2, unit: '顆' },
+    ],
+    note: '家裡煮',
+  })
+  const panel = () => within(screen.getByRole('region', { name: '用照片辨識食物' }))
+  const foodsIn = (meal: string) =>
+    within(screen.getByRole('group', { name: meal }))
+      .queryAllByRole('button', { name: /^移除 / })
+      .map((b) => b.getAttribute('aria-label')!.replace('移除 ', ''))
+
+  /** paste 比 type 快，也不會把 JSON 的 { 當成 userEvent 的特殊字元 */
+  async function pasteReply(user: ReturnType<typeof userEvent.setup>, reply: string) {
+    await user.click(panel().getByLabelText('貼上 AI 的回覆'))
+    await user.paste(reply)
+    await user.click(panel().getByRole('button', { name: '解析回覆' }))
+  }
+
+  async function open(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(screen.getByRole('button', { name: '用照片辨識食物' }))
+  }
+
+  it('一開始收合，按鈕可以展開與收起', async () => {
+    const user = userEvent.setup()
+    renderForm()
+    expect(screen.queryByRole('region', { name: '用照片辨識食物' })).not.toBeInTheDocument()
+
+    await open(user)
+    expect(panel().getByRole('button', { name: '複製提示詞' })).toBeVisible()
+
+    await user.click(screen.getByRole('button', { name: '收起照片辨識' }))
+    expect(screen.queryByRole('region', { name: '用照片辨識食物' })).not.toBeInTheDocument()
+  })
+
+  it('複製提示詞：寫進剪貼簿，內容含食物 JSON 格式與常吃的食物', async () => {
+    const user = userEvent.setup()
+    // userEvent.setup() 會換掉 navigator.clipboard，要在它之後再取
+    render(<EntryForm initial={emptyForm(DATE)} onDateChange={() => {}} knownFoods={['燕麥']} />)
+    await open(user)
+
+    await user.click(panel().getByRole('button', { name: '複製提示詞' }))
+    const copied = await navigator.clipboard.readText()
+    expect(copied).toContain('"items"')
+    expect(copied).toContain('燕麥')
+    expect(panel().getByText('已複製提示詞，連同食物照片一起貼給 AI')).toBeVisible()
+  })
+
+  it('複製失敗時把提示詞列出來讓使用者手動複製', async () => {
+    const user = userEvent.setup()
+    renderForm()
+    vi.spyOn(navigator.clipboard, 'writeText').mockRejectedValue(new Error('denied'))
+    await open(user)
+
+    await user.click(panel().getByRole('button', { name: '複製提示詞' }))
+    expect(await panel().findByLabelText('提示詞')).toHaveDisplayValue(/"items"/)
+    expect(panel().getByRole('status')).toHaveTextContent('無法自動複製')
+  })
+
+  it('貼上回覆 → 可修改名稱與份量 → 匯入指定的餐別，備註一起帶入，存檔後成為食物項目', async () => {
+    const user = userEvent.setup()
+    renderForm()
+    await open(user)
+    await pasteReply(user, REPLY)
+
+    expect(panel().getByLabelText('辨識結果第 1 項的名稱')).toHaveValue('燕麥粥')
+    expect(panel().getByLabelText('辨識結果備註')).toHaveValue('家裡煮')
+    await user.clear(panel().getByLabelText('辨識結果第 2 項的名稱'))
+    await user.type(panel().getByLabelText('辨識結果第 2 項的名稱'), '茶葉蛋')
+    await user.clear(panel().getByLabelText('辨識結果：茶葉蛋的數量'))
+    await user.type(panel().getByLabelText('辨識結果：茶葉蛋的數量'), '1')
+    await user.selectOptions(panel().getByLabelText('匯入到'), '午餐')
+    await user.click(panel().getByRole('button', { name: '匯入 2 項' }))
+
+    // 匯入後面板收起，食物進到午餐，之後還能再改名稱
+    expect(screen.queryByRole('region', { name: '用照片辨識食物' })).not.toBeInTheDocument()
+    expect(foodsIn('午餐')).toEqual(['燕麥粥', '茶葉蛋'])
+    expect(foodsIn('早餐')).toEqual([])
+    expect(screen.getByLabelText('午餐備註')).toHaveValue('家裡煮')
+    expect(screen.getByText('已加入 2 項到午餐，記得儲存')).toBeVisible()
+
+    await user.click(screen.getByRole('button', { name: '儲存' }))
+    await screen.findByText(`已儲存 ${DATE} 的紀錄`)
+    expect((await getEntry(DATE))?.meals).toEqual([
+      {
+        type: 'lunch',
+        items: [
+          { name: '燕麥粥', amount: 1, unit: '碗' },
+          { name: '茶葉蛋', amount: 1, unit: '顆' },
+        ],
+        description: '家裡煮',
+      },
+    ])
+  })
+
+  it('預設匯入到正在填的那一餐', async () => {
+    const user = userEvent.setup()
+    renderForm()
+    await user.click(screen.getByLabelText('新增食物：晚餐'))
+    await open(user)
+    await pasteReply(user, REPLY)
+
+    expect(panel().getByLabelText('匯入到')).toHaveValue('dinner')
+  })
+
+  it('可以移除不要的項目；全部移除後不能匯入', async () => {
+    const user = userEvent.setup()
+    renderForm()
+    await open(user)
+    await pasteReply(user, REPLY)
+
+    await user.click(panel().getByRole('button', { name: '辨識結果：移除 水煮蛋' }))
+    expect(panel().getByRole('button', { name: '匯入 1 項' })).toBeEnabled()
+    await user.click(panel().getByRole('button', { name: '辨識結果：移除 燕麥粥' }))
+    expect(panel().getByRole('button', { name: '匯入 0 項' })).toBeDisabled()
+  })
+
+  it('這餐已有同名的食物就略過，不蓋掉已經填好的份量', async () => {
+    const user = userEvent.setup()
+    renderForm()
+    await user.type(screen.getByLabelText('新增食物：早餐'), '燕麥粥{Enter}')
+    await user.clear(screen.getByLabelText('燕麥粥的數量'))
+    await user.type(screen.getByLabelText('燕麥粥的數量'), '3')
+    await open(user)
+    await pasteReply(user, REPLY)
+    await user.selectOptions(panel().getByLabelText('匯入到'), '早餐')
+    await user.click(panel().getByRole('button', { name: '匯入 2 項' }))
+
+    expect(foodsIn('早餐')).toEqual(['燕麥粥', '水煮蛋'])
+    expect(screen.getByLabelText('燕麥粥的數量')).toHaveValue(3)
+    expect(screen.getByText('已加入 1 項到早餐（1 項早餐已有，已略過），記得儲存')).toBeVisible()
+  })
+
+  it('回覆格式不對時顯示錯誤，不出現可匯入的項目；重貼新內容後可再解析', async () => {
+    const user = userEvent.setup()
+    renderForm()
+    await open(user)
+
+    expect(panel().getByRole('button', { name: '解析回覆' })).toBeDisabled()
+    await pasteReply(user, '抱歉，我看不到照片')
+    expect(panel().getByRole('status')).toHaveTextContent('找不到 JSON')
+    expect(panel().queryByRole('button', { name: /^匯入 / })).not.toBeInTheDocument()
+
+    await user.clear(panel().getByLabelText('貼上 AI 的回覆'))
+    await user.paste(REPLY)
+    await user.click(panel().getByRole('button', { name: '解析回覆' }))
+    expect(panel().getByRole('button', { name: '匯入 2 項' })).toBeEnabled()
+  })
+
+  it('解析後又改了貼上的內容，舊的辨識結果就收掉，要重新解析', async () => {
+    const user = userEvent.setup()
+    renderForm()
+    await open(user)
+    await pasteReply(user, REPLY)
+    expect(panel().getByRole('button', { name: '匯入 2 項' })).toBeVisible()
+
+    await user.type(panel().getByLabelText('貼上 AI 的回覆'), ' ')
+    expect(panel().queryByRole('button', { name: /^匯入 / })).not.toBeInTheDocument()
   })
 })

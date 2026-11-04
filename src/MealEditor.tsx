@@ -1,8 +1,13 @@
-import { ActionIcon, Button, Group, Input, NativeSelect, Text, TextInput } from '@mantine/core'
+import { Button, Group, Input, Text, TextInput } from '@mantine/core'
 import { useId, useState, type KeyboardEvent } from 'react'
-import { FOOD_UNITS } from '@/domain/entry'
 import { filterFoods } from '@/domain/food'
-import { toggleFoodItem, type FoodItemFormValues, type MealFormValues } from '@/domain/form'
+import {
+  removeFoodItem,
+  toggleFoodItem,
+  type FoodItemFormValues,
+  type MealFormValues,
+} from '@/domain/form'
+import { FoodItemRow } from './FoodItemRow'
 
 /** 常吃的食物先列這麼多個，其餘收進「更多」，清單再長也只佔幾行 */
 const CHIP_LIMIT = 12
@@ -19,7 +24,7 @@ interface Props {
   notePlaceholder: string
 }
 
-/** 一餐吃的食物：一項一列（名稱、數量、單位），可以輸入新的或點選常吃的；另有備註 */
+/** 一餐吃的食物：一項一列（名稱、數量、單位，名稱可以改），可以輸入新的或點選常吃的；另有備註 */
 export function MealEditor({
   label,
   value,
@@ -69,46 +74,17 @@ export function MealEditor({
         {label}
       </Input.Label>
 
-      {value.items.map((item, i) => {
-        // 舊資料的單位可能不在選單裡（例如「粒」），也要選得到
-        const units = FOOD_UNITS.includes(item.unit as (typeof FOOD_UNITS)[number])
-          ? FOOD_UNITS
-          : [...FOOD_UNITS, item.unit]
-        return (
-          <Group key={item.name} gap="xs" wrap="nowrap" mb="xs">
-            <Text flex={1} style={{ overflowWrap: 'anywhere' }}>
-              {item.name}
-            </Text>
-            <TextInput
-              w="4.5rem"
-              type="number"
-              inputMode="decimal"
-              step="0.5"
-              min="0"
-              aria-label={`${item.name}的數量`}
-              value={item.amount}
-              onChange={(e) => setItem(i, { amount: e.target.value })}
-            />
-            <NativeSelect
-              w="5.25rem"
-              aria-label={`${item.name}的單位`}
-              data={units}
-              value={item.unit}
-              onChange={(e) => setItem(i, { unit: e.target.value })}
-            />
-            <ActionIcon
-              type="button"
-              variant="subtle"
-              color="gray"
-              size="input-md"
-              aria-label={`移除 ${item.name}`}
-              onClick={() => onChange(toggleFoodItem(value, item.name))}
-            >
-              ×
-            </ActionIcon>
-          </Group>
-        )
-      })}
+      {value.items.map((item, i) => (
+        // 名稱可以改，所以用位置當 key，輸入時才不會因為 key 變了而失去焦點
+        <FoodItemRow
+          key={i}
+          item={item}
+          index={i}
+          scope={label}
+          onChange={(patch) => setItem(i, patch)}
+          onRemove={() => onChange(removeFoodItem(value, i))}
+        />
+      ))}
 
       <Group gap="xs" wrap="nowrap">
         <TextInput

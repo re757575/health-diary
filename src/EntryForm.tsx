@@ -25,6 +25,7 @@ import {
   type MealType,
 } from '@/domain/entry'
 import {
+  addFoodItems,
   addWater,
   emptyForm,
   entryToForm,
@@ -35,6 +36,7 @@ import {
   shiftDate,
   toTimeString,
   type BowelFormValues,
+  type FoodItemFormValues,
   type FormValues,
 } from '@/domain/form'
 import { RatingPicker } from './RatingPicker'
@@ -48,6 +50,7 @@ import type { Medication } from '@/domain/medication'
 import { PRESET_TAGS, addTag, toggleTag } from '@/domain/tag'
 import { ChipChoices } from './ChipChoices'
 import { MealEditor } from './MealEditor'
+import { PhotoFoodImport } from './PhotoFoodImport'
 import { isSuspectWeight, type DayWeight } from '@/domain/weight'
 import { useStatus } from './useStatus'
 
@@ -67,6 +70,8 @@ interface Props {
   knownAsNeeded?: readonly string[]
   /** 常吃的食物，依各餐吃過的次數排序；三餐可以直接點選 */
   foodsByMeal?: Partial<Record<MealType, readonly string[]>>
+  /** 全部的常吃食物，放進照片辨識的提示詞；沒給就不列 */
+  knownFoods?: readonly string[]
   /** 這天之前最近一次量的體重；體重沒填時沿用它，顯示在欄位提示 */
   previousWeight?: DayWeight
 }
@@ -93,6 +98,7 @@ export function EntryForm({
   medications = [],
   knownAsNeeded = [],
   foodsByMeal = {},
+  knownFoods = [],
 }: Props) {
   const medicationsLabelId = useId()
   // 正在填的餐別；常吃的食物只列在這一餐下面
@@ -188,6 +194,13 @@ export function EntryForm({
       set('meals', meals)
       setStatus(`已帶入 ${previousDate} 的 ${filled} 個餐別，記得檢查後儲存`)
     }
+  }
+
+  /** 照片辨識的結果加進指定的餐別，已有同名食物的略過 */
+  function importPhotoFoods(type: MealType, items: FoodItemFormValues[], note: string) {
+    const { meal, added, skipped } = addFoodItems(form.meals[type], items, note)
+    set('meals', { ...form.meals, [type]: meal })
+    return { added, skipped }
   }
 
   async function handleSubmit(event: FormEvent) {
@@ -396,6 +409,11 @@ export function EntryForm({
         >
           複製前一天的餐點
         </Button>
+        <PhotoFoodImport
+          knownFoods={knownFoods}
+          activeMeal={activeMeal}
+          onImport={importPhotoFoods}
+        />
         {MEAL_TYPES.map((type) => (
           <MealEditor
             key={type}

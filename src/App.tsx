@@ -63,6 +63,11 @@ export default function App() {
       ),
     [foodList, history],
   )
+  // 照片辨識的提示詞用：整體最常吃的排前面
+  const knownFoods = useMemo(
+    () => sortFoodsByUsage(foodList ?? [], history ?? []),
+    [foodList, history],
+  )
   const todaysMedications = useMemo(
     () => activeMedications(medications ?? [], date),
     [medications, date],
@@ -196,6 +201,7 @@ export default function App() {
                   medications={todaysMedications}
                   knownAsNeeded={asNeededNames}
                   foodsByMeal={foodsByMeal}
+                  knownFoods={knownFoods}
                 />
               )}
             </Section>

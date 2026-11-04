@@ -639,6 +639,44 @@ test('常吃的食物：匯入清單 → 早餐直接點選 → 存檔後進 AI 
   await expect(page.getByLabel('提示詞')).toContainText('早餐：燕麥 1 份、無糖豆漿 1 杯')
 })
 
+test('用照片辨識食物：貼上 AI 回覆 → 改名稱 → 匯入午餐 → 存檔後進 AI 提示詞', async ({ page }) => {
+  await page.goto('./')
+  await page.getByRole('button', { name: '用照片辨識食物' }).click()
+  const panel = page.getByRole('region', { name: '用照片辨識食物' })
+
+  await panel.getByRole('button', { name: '複製提示詞' }).waitFor()
+  await panel.getByLabel('貼上 AI 的回覆').fill(
+    '好的，辨識結果如下：\n```json\n' +
+      JSON.stringify({
+        items: [
+          { name: '雞腿便當', amount: 1, unit: '個' },
+          { name: '無糖綠茶', amount: 1, unit: '瓶' },
+        ],
+        note: '外食',
+      }) +
+      '\n```',
+  )
+  await panel.getByRole('button', { name: '解析回覆' }).click()
+  await panel.getByLabel('辨識結果第 2 項的名稱').fill('綠茶')
+  await panel.getByLabel('匯入到').selectOption('lunch')
+  await panel.getByRole('button', { name: '匯入 2 項' }).click()
+  await expect(page.getByText('已加入 2 項到午餐，記得儲存')).toBeVisible()
+  await expect(foodRow(page, '午餐', '雞腿便當')).toBeVisible()
+  await expect(foodRow(page, '午餐', '綠茶')).toBeVisible()
+
+  // 匯入後還能在餐點裡再改名稱
+  await page.getByLabel('午餐第 1 項的名稱').fill('排骨便當')
+  await page.getByRole('button', { name: '儲存', exact: true }).click()
+  await expect(page.getByText(/已儲存 \d{4}-\d{2}-\d{2} 的紀錄/)).toBeVisible()
+
+  await page.reload()
+  await expect(foodRow(page, '午餐', '排骨便當')).toBeVisible()
+  await expect(page.getByLabel('午餐備註')).toHaveValue('外食')
+  await openTab(page, '設定')
+  await page.getByRole('button', { name: '產生 AI 提示詞' }).click()
+  await expect(page.getByLabel('提示詞')).toContainText('午餐：排骨便當 1 個、綠茶 1 瓶；外食')
+})
+
 test('匯入舊版備份：整段文字的餐點自動拆成一項項的食物，地點移到備註', async ({ page }) => {
   const today = await page.evaluate(() => {
     const d = new Date()

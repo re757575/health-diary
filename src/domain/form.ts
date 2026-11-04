@@ -1,4 +1,5 @@
 import { DEFAULT_FOOD_UNIT, MEAL_TYPES, type Entry, type MealType, type SymptomItem } from './entry'
+import { foodKey } from './food'
 
 export interface FoodItemFormValues {
   name: string
@@ -87,6 +88,38 @@ export function toggleFoodItem(meal: MealFormValues, name: string): MealFormValu
     items: exists
       ? meal.items.filter((i) => i.name !== name)
       : [...meal.items, { name, amount: '1', unit: DEFAULT_FOOD_UNIT }],
+  }
+}
+
+/** 依位置移除一項。食物名稱可以改，不能再用名稱找 */
+export function removeFoodItem(meal: MealFormValues, index: number): MealFormValues {
+  return { ...meal, items: meal.items.filter((_, i) => i !== index) }
+}
+
+/**
+ * 把一批食物（例如照片辨識的結果）加進一餐：名稱已經在這餐的略過（不蓋掉已經調整過的份量）。
+ * 備註接在原本的備註後面，已經包含就不重複。回傳新的餐點與略過了幾項
+ */
+export function addFoodItems(
+  meal: MealFormValues,
+  items: readonly FoodItemFormValues[],
+  note = '',
+): { meal: MealFormValues; added: number; skipped: number } {
+  const keys = new Set(meal.items.map((i) => foodKey(i.name)))
+  const fresh = items.filter((i) => {
+    const key = foodKey(i.name)
+    if (keys.has(key)) return false
+    keys.add(key)
+    return true
+  })
+  const extra = note.trim()
+  const current = meal.note.trim()
+  const merged =
+    !extra || current.includes(extra) ? meal.note : current ? `${current}；${extra}` : extra
+  return {
+    meal: { items: [...meal.items, ...fresh.map((i) => ({ ...i }))], note: merged },
+    added: fresh.length,
+    skipped: items.length - fresh.length,
   }
 }
 

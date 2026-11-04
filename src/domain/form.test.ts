@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import { entrySchema } from './entry'
 import {
+  addFoodItems,
   addWater,
   emptyForm,
   entryToForm,
   fillEmptyMeals,
   formToEntry,
   isSameEntry,
+  removeFoodItem,
   toggleFoodItem,
   shiftDate,
   toDateString,
@@ -99,6 +101,46 @@ describe('toggleFoodItem', () => {
     const added = toggleFoodItem({ items: [], note: '外食' }, '燕麥')
     expect(added).toEqual({ items: [{ name: '燕麥', amount: '1', unit: '份' }], note: '外食' })
     expect(toggleFoodItem(added, '燕麥')).toEqual({ items: [], note: '外食' })
+  })
+})
+
+describe('removeFoodItem', () => {
+  it('依位置移除，同名的只移除指定那一項', () => {
+    const item = (name: string) => ({ name, amount: '1', unit: '份' })
+    const meal = { items: [item('燕麥'), item('燕麥'), item('香蕉')], note: '' }
+    expect(removeFoodItem(meal, 1).items).toEqual([item('燕麥'), item('香蕉')])
+  })
+})
+
+describe('addFoodItems', () => {
+  const item = (name: string, amount = '1', unit = '份') => ({ name, amount, unit })
+
+  it('接在原有的食物後面；這餐已有的名稱略過，不蓋掉已調整的份量', () => {
+    const meal = { items: [item('燕麥', '2', '碗')], note: '' }
+    const result = addFoodItems(meal, [item('燕麥'), item('香蕉', '1', '根'), item('Ｍilk')])
+    expect(result.meal.items.map((i) => i.name)).toEqual(['燕麥', '香蕉', 'Ｍilk'])
+    expect(result.meal.items[0]).toEqual(item('燕麥', '2', '碗'))
+    expect(result).toMatchObject({ added: 2, skipped: 1 })
+  })
+
+  it('名稱用全形半形、大小寫不同寫法也算已有', () => {
+    const result = addFoodItems({ items: [item('milk')], note: '' }, [item('ＭＩＬＫ')])
+    expect(result).toMatchObject({ added: 0, skipped: 1 })
+  })
+
+  it('備註接在原本的備註後面；已經包含或沒有就不動', () => {
+    const base = { items: [], note: '' }
+    expect(addFoodItems(base, [], '家裡煮').meal.note).toBe('家裡煮')
+    expect(addFoodItems({ ...base, note: '外食' }, [], '便當').meal.note).toBe('外食；便當')
+    expect(addFoodItems({ ...base, note: '外食、便當' }, [], '便當').meal.note).toBe('外食、便當')
+    expect(addFoodItems({ ...base, note: '外食' }, [], '  ').meal.note).toBe('外食')
+  })
+
+  it('不會改到傳入的物件', () => {
+    const items = [item('香蕉')]
+    const result = addFoodItems({ items: [], note: '' }, items)
+    result.meal.items[0]!.amount = '9'
+    expect(items[0]!.amount).toBe('1')
   })
 })
 
