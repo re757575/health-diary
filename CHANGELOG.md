@@ -2,6 +2,11 @@
 
 本檔案由 [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) 依照 [Conventional Commits](https://www.conventionalcommits.org/) 規範的 commit 訊息自動產生，請勿手動編輯內容，執行 `npm run release` 即可更新。
 
+## [0.1.18](https://github.com/re757575/health-diary/compare/v0.1.17...v0.1.18) (2026-11-04)
+
+### Features
+
+* **meal:** 用照片辨識食物並匯入三餐，食物名稱可修改 ([0a745d4](https://github.com/re757575/health-diary/commit/0a745d4731ec32c35c46805744ec4f9faf191354))
 ## [0.1.17](https://github.com/re757575/health-diary/compare/v0.1.16...v0.1.17) (2026-11-01)
 
 ### Features
