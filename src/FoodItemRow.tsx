@@ -38,10 +38,10 @@ export function FoodItemRow({
     ? FOOD_UNITS
     : [...FOOD_UNITS, item.unit]
   return (
-    // 窄螢幕放不下一行：名稱欄位佔滿一行，數量、單位、移除移到下一行靠右（寬螢幕仍是單行）
+    // 一律單行；間距比預設小，手機上每一欄都要省，名稱欄位才有地方顯示食物名稱
     <Group
       gap={6}
-      wrap="wrap"
+      wrap="nowrap"
       mb="xs"
       data-food-row
       style={{
@@ -53,41 +53,41 @@ export function FoodItemRow({
     >
       {leading}
       <TextInput
-        flex="1 1 10rem"
+        flex={1}
         miw={0}
         aria-label={`${scope}第 ${index + 1} 項的名稱`}
         value={item.name}
         onChange={(e) => onChange({ name: e.target.value })}
       />
-      <Group gap={6} wrap="nowrap" ml="auto">
-        <TextInput
-          w="4.5rem"
-          type="number"
-          inputMode="decimal"
-          step="0.5"
-          min="0"
-          aria-label={`${labelPrefix}${item.name}的數量`}
-          value={item.amount}
-          onChange={(e) => onChange({ amount: e.target.value })}
-        />
-        <NativeSelect
-          w="5.25rem"
-          aria-label={`${labelPrefix}${item.name}的單位`}
-          data={units}
-          value={item.unit}
-          onChange={(e) => onChange({ unit: e.target.value })}
-        />
-        <ActionIcon
-          type="button"
-          variant="subtle"
-          color="gray"
-          size="input-md"
-          aria-label={`${labelPrefix}移除 ${item.name}`}
-          onClick={onRemove}
-        >
-          ×
-        </ActionIcon>
-      </Group>
+      <TextInput
+        w="4rem"
+        type="number"
+        inputMode="decimal"
+        step="0.5"
+        min="0"
+        aria-label={`${labelPrefix}${item.name}的數量`}
+        value={item.amount}
+        onChange={(e) => onChange({ amount: e.target.value })}
+      />
+      <NativeSelect
+        w="5rem"
+        aria-label={`${labelPrefix}${item.name}的單位`}
+        data={units}
+        value={item.unit}
+        onChange={(e) => onChange({ unit: e.target.value })}
+      />
+      <ActionIcon
+        type="button"
+        variant="subtle"
+        color="gray"
+        size="input-md"
+        // 寬度比高度窄：手機上把空間留給名稱欄位，高度仍維持好點的大小
+        style={{ width: 34, minWidth: 34 }}
+        aria-label={`${labelPrefix}移除 ${item.name}`}
+        onClick={onRemove}
+      >
+        ×
+      </ActionIcon>
     </Group>
   )
 }
