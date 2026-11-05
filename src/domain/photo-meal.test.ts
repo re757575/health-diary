@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { FOOD_UNITS } from './entry'
-import { buildPhotoPrompt, guessMeal, parsePhotoMeal } from './photo-meal'
+import { buildPhotoPrompt, fitWithin, guessMeal, parsePhotoMeal } from './photo-meal'
 
 describe('buildPhotoPrompt', () => {
   it('說明輸出格式，並列出所有可用的單位', () => {
@@ -149,5 +149,21 @@ describe('guessMeal', () => {
       'dinner',
       'snack',
     ])
+  })
+})
+
+describe('fitWithin', () => {
+  it('長邊超過上限就等比例縮小，橫的、直的都一樣', () => {
+    expect(fitWithin(4000, 3000, 1280)).toEqual({ width: 1280, height: 960 })
+    expect(fitWithin(3000, 4000, 1280)).toEqual({ width: 960, height: 1280 })
+  })
+
+  it('沒超過上限（含剛好等於）維持原尺寸，不放大', () => {
+    expect(fitWithin(800, 600, 1280)).toEqual({ width: 800, height: 600 })
+    expect(fitWithin(1280, 720, 1280)).toEqual({ width: 1280, height: 720 })
+  })
+
+  it('極端細長的圖短邊至少 1 像素', () => {
+    expect(fitWithin(10000, 2, 1280)).toEqual({ width: 1280, height: 1 })
   })
 })

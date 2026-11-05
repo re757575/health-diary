@@ -2,6 +2,9 @@ import { DEFAULT_FOOD_UNIT, FOOD_UNITS, type MealType } from './entry'
 import { MAX_FOOD_NAME_LENGTH, foodKey } from './food'
 import type { FoodItemFormValues } from './form'
 
+/** 傳給 AI 的照片長邊上限（像素）：夠 AI 認出食物，檔案也小得多，分享和上傳都快 */
+export const PHOTO_MAX_SIDE = 1280
+
 /** 提示詞裡最多列出幾個常吃的食物，清單很長時只列前面（已依吃的次數排序） */
 const MAX_KNOWN_FOODS = 60
 
@@ -134,4 +137,19 @@ export function guessMeal(now: Date): MealType {
   if (hour >= 10 && hour < 15) return 'lunch'
   if (hour >= 17 && hour < 21) return 'dinner'
   return 'snack'
+}
+
+/** 長邊超過 maxSide 就等比例縮小，沒超過維持原尺寸（不放大） */
+export function fitWithin(
+  width: number,
+  height: number,
+  maxSide: number,
+): { width: number; height: number } {
+  const longSide = Math.max(width, height)
+  if (longSide <= maxSide) return { width, height }
+  const scale = maxSide / longSide
+  return {
+    width: Math.max(1, Math.round(width * scale)),
+    height: Math.max(1, Math.round(height * scale)),
+  }
 }

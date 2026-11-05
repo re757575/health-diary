@@ -11,7 +11,7 @@ function download(file: File) {
  * 手機上改用系統的分享選單：可以直接存到 iCloud 雲碟、Google 雲端硬碟或傳給自己，
  * 檔案才不會只留在同一台手機上。電腦上下載比較直覺，維持下載
  */
-function canShareFile(file: File): boolean {
+export function canShareFile(file: File): boolean {
   return (
     window.matchMedia('(pointer: coarse)').matches &&
     typeof navigator.share === 'function' &&

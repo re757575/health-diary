@@ -1,3 +1,4 @@
+import { crc32, deflateSync } from 'node:zlib'
 import { expect, test, type Page } from '@playwright/test'
 
 const openTab = (page: Page, name: '今天' | '趨勢' | '就醫' | '報告' | '設定') =>
@@ -778,4 +779,87 @@ test('就醫紀錄：帶入當天症狀 → 填診所與醫囑 → 重新整理�
   const prompt = page.getByLabel('提示詞')
   await expect(prompt).toContainText('# 就醫紀錄')
   await expect(prompt).toContainText('- 醫囑：規律作息；避免長時間低頭')
+})
+
+/** 純色的 PNG（RGB）：不依賴任何套件，產生 E2E 用的大尺寸「照片」 */
+function solidPng(width: number, height: number): Buffer {
+  const chunk = (type: string, data: Buffer) => {
+    const body = Buffer.concat([Buffer.from(type), data])
+    const length = Buffer.alloc(4)
+    length.writeUInt32BE(data.length)
+    const crc = Buffer.alloc(4)
+    crc.writeUInt32BE(crc32(body))
+    return Buffer.concat([length, body, crc])
+  }
+  const header = Buffer.alloc(13)
+  header.writeUInt32BE(width, 0)
+  header.writeUInt32BE(height, 4)
+  header.set([8, 2, 0, 0, 0], 8) // 8 位元、RGB、無壓縮濾鏡與交錯
+  // 每列：濾鏡位元組 0 + 每像素 3 個位元組（橘色）
+  const row = Buffer.concat([Buffer.from([0]), Buffer.alloc(width * 3, 0)])
+  for (let x = 0; x < width; x++) row.set([230, 120, 40], 1 + x * 3)
+  return Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    chunk('IHDR', header),
+    chunk('IDAT', deflateSync(Buffer.concat(Array.from({ length: height }, () => row)))),
+    chunk('IEND', Buffer.alloc(0)),
+  ])
+}
+
+test('拍照 → 縮圖 → 分享給 AI App → 貼上並解析 → 匯入午餐', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write'])
+  // 測試用的瀏覽器沒有系統分享選單：換成假的，記下收到的照片（尺寸要解碼才看得到）與提示詞
+  await page.addInitScript(`
+    Object.defineProperty(navigator, 'canShare', { value: () => true, configurable: true })
+    Object.defineProperty(navigator, 'share', {
+      configurable: true,
+      value: async (data) => {
+        const photo = data.files[0]
+        const bitmap = await createImageBitmap(photo)
+        window.shared = {
+          type: photo.type,
+          size: photo.size,
+          width: bitmap.width,
+          height: bitmap.height,
+          text: data.text,
+        }
+      },
+    })
+  `)
+  await page.goto('./')
+  await page.getByRole('button', { name: '用照片辨識食物' }).click()
+  const panel = page.getByRole('region', { name: '用照片辨識食物' })
+
+  // 選到手機相機拍的大圖（3000×2000）：縮到長邊 1280 以內再分享
+  const original = solidPng(3000, 2000)
+  await panel.getByLabel('食物照片（相機）').setInputFiles({
+    name: 'IMG_0001.png',
+    mimeType: 'image/png',
+    buffer: original,
+  })
+  await expect(panel.getByAltText('食物照片預覽')).toBeVisible()
+
+  await panel.getByRole('button', { name: '分享給 AI App' }).click()
+  await expect(panel.getByRole('status')).toContainText('已分享照片；提示詞也複製了')
+  const shared = await page.evaluate<Record<string, string | number>>('window.shared')
+  expect(shared.type).toBe('image/jpeg')
+  expect(shared.width).toBe(1280)
+  expect(shared.height).toBe(853)
+  expect(shared.text).toContain('"items"')
+  expect(await page.evaluate('navigator.clipboard.readText()')).toBe(shared.text)
+
+  // AI 回覆複製後，一鍵貼上並解析
+  const reply = '```json\n{"items":[{"name":"雞腿便當","amount":1,"unit":"個"}],"note":"外食"}\n```'
+  await page.evaluate(`navigator.clipboard.writeText(${JSON.stringify(reply)})`)
+  await panel.getByRole('button', { name: '貼上並解析' }).click()
+  await expect(panel.getByLabel('辨識結果第 1 項的名稱')).toHaveValue('雞腿便當')
+  await panel.getByLabel('匯入到').selectOption('lunch')
+  await panel.getByRole('button', { name: '匯入 1 項' }).click()
+
+  await expect(page.getByText('已加入 1 項到午餐，記得儲存')).toBeVisible()
+  await expect(foodRow(page, '午餐', '雞腿便當')).toBeVisible()
+  await expect(page.getByLabel('午餐備註')).toHaveValue('外食')
+  // 匯入後面板收起、照片清掉
+  await page.getByRole('button', { name: '用照片辨識食物' }).click()
+  await expect(panel.getByAltText('食物照片預覽')).toHaveCount(0)
 })
