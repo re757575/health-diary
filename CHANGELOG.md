@@ -2,6 +2,11 @@
 
 本檔案由 [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) 依照 [Conventional Commits](https://www.conventionalcommits.org/) 規範的 commit 訊息自動產生，請勿手動編輯內容，執行 `npm run release` 即可更新。
 
+## [0.1.19](https://github.com/re757575/health-diary/compare/v0.1.18...v0.1.19) (2026-11-05)
+
+### Features
+
+* **meal:** 照片辨識改為拍照後分享給 AI App，回覆一鍵貼上解析 ([b92a548](https://github.com/re757575/health-diary/commit/b92a548eb8ec1e6de8ab8d67c17736cd5895f97f))
 ## [0.1.18](https://github.com/re757575/health-diary/compare/v0.1.17...v0.1.18) (2026-11-04)
 
 ### Features
