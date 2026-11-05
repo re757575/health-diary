@@ -640,6 +640,73 @@ test('常吃的食物：匯入清單 → 早餐直接點選 → 存檔後進 AI 
   await expect(page.getByLabel('提示詞')).toContainText('早餐：燕麥 1 份、無糖豆漿 1 杯')
 })
 
+test('食物可以拖曳到另一餐：存檔後重新整理仍在新的那一餐', async ({ page }) => {
+  await page.goto('./')
+  await addFood(page, '早餐', '燕麥奶')
+  await addFood(page, '早餐', '香蕉')
+
+  // 按住香蕉前面的把手，拖到午餐區塊上放開（先捲到兩者都在畫面內）
+  const handle = page.getByRole('button', { name: '拖曳 香蕉' })
+  // 把手捲到畫面上方，午餐就會在它下面的畫面內
+  const top = (await handle.boundingBox())!.y
+  await page.evaluate(`window.scrollBy(0, ${top - 120})`)
+  const from = (await handle.boundingBox())!
+  const lunch = (await page.getByRole('group', { name: '午餐', exact: true }).boundingBox())!
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(lunch.x + lunch.width / 2, lunch.y + lunch.height / 2, { steps: 8 })
+  // 拖的過程中：浮起的那一列跟著滑鼠走（只有一個），放開後收掉
+  const ghost = page.locator('[data-drag-ghost]')
+  await expect(ghost).toHaveCount(1)
+  const ghostBox = (await ghost.boundingBox())!
+  expect(Math.abs(ghostBox.y + ghostBox.height / 2 - (lunch.y + lunch.height / 2))).toBeLessThan(
+    from.height,
+  )
+  await page.mouse.up()
+  await expect(ghost).toHaveCount(0)
+
+  await expect(foodRow(page, '早餐', '香蕉')).toHaveCount(0)
+  await expect(foodRow(page, '早餐', '燕麥奶')).toBeVisible()
+  await expect(foodRow(page, '午餐', '香蕉')).toBeVisible()
+
+  await page.getByRole('button', { name: '儲存' }).click()
+  await expect(page.getByRole('status').filter({ hasText: '已儲存' })).toBeVisible()
+  await page.reload()
+  await expect(foodRow(page, '午餐', '香蕉')).toBeVisible()
+  await expect(foodRow(page, '早餐', '香蕉')).toHaveCount(0)
+})
+
+test('同一餐內拖曳重新排序：存檔後重新整理順序不變', async ({ page }) => {
+  await page.goto('./')
+  for (const name of ['燕麥奶', '香蕉', '豆漿']) await addFood(page, '早餐', name)
+  const names = () =>
+    Promise.all([1, 2, 3].map((n) => page.getByLabel(`早餐第 ${n} 項的名稱`).inputValue()))
+  expect(await names()).toEqual(['燕麥奶', '香蕉', '豆漿'])
+
+  // 先捲到早餐在畫面上方，再按住豆漿的把手，拖到第一列的上緣放開
+  const first = page.getByLabel('早餐第 1 項的名稱')
+  const top = (await first.boundingBox())!.y
+  await page.evaluate(`window.scrollBy(0, ${top - 120})`)
+  const handle = (await page.getByRole('button', { name: '拖曳 豆漿' }).boundingBox())!
+  const firstBox = (await first.boundingBox())!
+  await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(firstBox.x + firstBox.width / 2, firstBox.y + 4, { steps: 8 })
+  await page.mouse.up()
+  await expect.poll(names).toEqual(['豆漿', '燕麥奶', '香蕉'])
+
+  await page.getByRole('button', { name: '儲存' }).click()
+  await expect(page.getByRole('status').filter({ hasText: '已儲存' })).toBeVisible()
+  await page.reload()
+  expect(await names()).toEqual(['豆漿', '燕麥奶', '香蕉'])
+
+  // 鍵盤：聚焦把手按往下，移一格，焦點跟著
+  await page.getByRole('button', { name: '拖曳 豆漿' }).focus()
+  await page.keyboard.press('ArrowDown')
+  await expect.poll(names).toEqual(['燕麥奶', '豆漿', '香蕉'])
+  await expect(page.getByRole('button', { name: '拖曳 豆漿' })).toBeFocused()
+})
+
 test('用照片辨識食物：貼上 AI 回覆 → 改名稱 → 匯入午餐 → 存檔後進 AI 提示詞', async ({ page }) => {
   await page.goto('./')
   await page.getByRole('button', { name: '用照片辨識食物' }).click()

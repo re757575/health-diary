@@ -8,7 +8,9 @@ import {
   fillEmptyMeals,
   formToEntry,
   isSameEntry,
+  moveFoodItem,
   removeFoodItem,
+  stepFoodItem,
   toggleFoodItem,
   shiftDate,
   toDateString,
@@ -109,6 +111,146 @@ describe('removeFoodItem', () => {
     const item = (name: string) => ({ name, amount: '1', unit: '份' })
     const meal = { items: [item('燕麥'), item('燕麥'), item('香蕉')], note: '' }
     expect(removeFoodItem(meal, 1).items).toEqual([item('燕麥'), item('香蕉')])
+  })
+})
+
+describe('moveFoodItem', () => {
+  const item = (name: string, amount = '1', unit = '份') => ({ name, amount, unit })
+  const meals = () => ({
+    breakfast: { items: [item('燕麥', '2', '碗'), item('香蕉'), item('豆漿')], note: '家裡' },
+    lunch: { items: [item('便當'), item('湯')], note: '外食' },
+    dinner: { items: [], note: '' },
+    snack: { items: [], note: '' },
+  })
+  const names = (meal: { items: { name: string }[] }) => meal.items.map((i) => i.name)
+
+  describe('移到另一餐', () => {
+    it('沒指定位置就接在最後面，份量與單位照舊，備註不動', () => {
+      const result = moveFoodItem(meals(), 'breakfast', 0, 'lunch')
+      expect(result.status).toBe('moved')
+      expect(result.meals.breakfast).toEqual({ items: [item('香蕉'), item('豆漿')], note: '家裡' })
+      expect(result.meals.lunch).toEqual({
+        items: [item('便當'), item('湯'), item('燕麥', '2', '碗')],
+        note: '外食',
+      })
+      expect(result).toMatchObject({ at: { meal: 'lunch', index: 2 } })
+    })
+
+    it('指定位置就插在那裡；超出範圍的位置視為最前或最後', () => {
+      expect(names(moveFoodItem(meals(), 'breakfast', 0, 'lunch', 1).meals.lunch)).toEqual([
+        '便當',
+        '燕麥',
+        '湯',
+      ])
+      expect(names(moveFoodItem(meals(), 'breakfast', 0, 'lunch', 0).meals.lunch)).toEqual([
+        '燕麥',
+        '便當',
+        '湯',
+      ])
+      expect(names(moveFoodItem(meals(), 'breakfast', 0, 'lunch', 99).meals.lunch)).toEqual([
+        '便當',
+        '湯',
+        '燕麥',
+      ])
+    })
+
+    it('移到空的一餐', () => {
+      const result = moveFoodItem(meals(), 'lunch', 1, 'dinner', 0)
+      expect(names(result.meals.dinner)).toEqual(['湯'])
+      expect(names(result.meals.lunch)).toEqual(['便當'])
+    })
+
+    it('目標那餐已有同名食物（全形半形、大小寫視為相同）：不移動，避免重複', () => {
+      const before = meals()
+      before.lunch.items.push(item('ＢＡＮＡＮＡ'))
+      before.breakfast.items[1] = item('banana')
+      const result = moveFoodItem(before, 'breakfast', 1, 'lunch')
+      expect(result.status).toBe('duplicate')
+      expect(result.meals).toBe(before)
+    })
+  })
+
+  describe('同一餐內重新排序', () => {
+    // 位置是「插在第幾項前面」（0 是最前面、長度是最後面），以拖曳前的清單計算
+    it.each([
+      [0, 2, ['香蕉', '燕麥', '豆漿']],
+      [0, 3, ['香蕉', '豆漿', '燕麥']],
+      [2, 0, ['豆漿', '燕麥', '香蕉']],
+      [2, 1, ['燕麥', '豆漿', '香蕉']],
+      [1, 0, ['香蕉', '燕麥', '豆漿']],
+    ])('第 %i 項插到位置 %i', (index, at, expected) => {
+      const result = moveFoodItem(meals(), 'breakfast', index, 'breakfast', at)
+      expect(result.status).toBe('moved')
+      expect(names(result.meals.breakfast)).toEqual(expected)
+      expect(result.meals.breakfast.note).toBe('家裡')
+      expect(result).toMatchObject({ at: { meal: 'breakfast' } })
+    })
+
+    it('份量與單位跟著那一項走', () => {
+      const result = moveFoodItem(meals(), 'breakfast', 0, 'breakfast', 3)
+      expect(result.meals.breakfast.items[2]).toEqual(item('燕麥', '2', '碗'))
+      expect(result).toMatchObject({ at: { meal: 'breakfast', index: 2 } })
+    })
+
+    it('放在自己前面或後面（位置沒變）、位置不存在：不變', () => {
+      const before = meals()
+      expect(moveFoodItem(before, 'breakfast', 1, 'breakfast', 1)).toEqual({
+        meals: before,
+        status: 'unchanged',
+      })
+      expect(moveFoodItem(before, 'breakfast', 1, 'breakfast', 2).status).toBe('unchanged')
+      expect(moveFoodItem(before, 'dinner', 0, 'lunch').status).toBe('unchanged')
+    })
+  })
+})
+
+describe('stepFoodItem', () => {
+  const item = (name: string) => ({ name, amount: '1', unit: '份' })
+  const meals = () => ({
+    breakfast: { items: [item('燕麥'), item('香蕉')], note: '' },
+    lunch: { items: [item('便當'), item('湯')], note: '' },
+    dinner: { items: [] as ReturnType<typeof item>[], note: '' },
+    snack: { items: [] as ReturnType<typeof item>[], note: '' },
+  })
+  const names = (meal: { items: { name: string }[] }) => meal.items.map((i) => i.name)
+
+  it('餐內還有空間就在同一餐裡往上或往下一格', () => {
+    const down = stepFoodItem(meals(), 'breakfast', 0, 1)
+    expect(names(down.meals.breakfast)).toEqual(['香蕉', '燕麥'])
+    expect(down).toMatchObject({ status: 'moved', at: { meal: 'breakfast', index: 1 } })
+
+    const up = stepFoodItem(meals(), 'lunch', 1, -1)
+    expect(names(up.meals.lunch)).toEqual(['湯', '便當'])
+    expect(up).toMatchObject({ at: { meal: 'lunch', index: 0 } })
+  })
+
+  it('已經在最後一項再往下：移到後一餐的最前面', () => {
+    const result = stepFoodItem(meals(), 'breakfast', 1, 1)
+    expect(names(result.meals.breakfast)).toEqual(['燕麥'])
+    expect(names(result.meals.lunch)).toEqual(['香蕉', '便當', '湯'])
+    expect(result).toMatchObject({ at: { meal: 'lunch', index: 0 } })
+  })
+
+  it('已經在第一項再往上：移到前一餐的最後面', () => {
+    const result = stepFoodItem(meals(), 'lunch', 0, -1)
+    expect(names(result.meals.breakfast)).toEqual(['燕麥', '香蕉', '便當'])
+    expect(result).toMatchObject({ at: { meal: 'breakfast', index: 2 } })
+  })
+
+  it('第一餐的第一項往上、最後一餐的最後一項往下：沒有地方可去，不變', () => {
+    const before = meals()
+    expect(stepFoodItem(before, 'breakfast', 0, -1).status).toBe('unchanged')
+    before.snack.items.push(item('餅乾'))
+    expect(stepFoodItem(before, 'snack', 0, 1).status).toBe('unchanged')
+  })
+
+  it('要移到前後一餐，但那一餐已有同名食物：不移動並回報重複', () => {
+    const before = meals()
+    before.breakfast.items = [item('燕麥')]
+    before.lunch.items.push(item('燕麥'))
+    const result = stepFoodItem(before, 'breakfast', 0, 1)
+    expect(result.status).toBe('duplicate')
+    expect(result.meals).toBe(before)
   })
 })
 

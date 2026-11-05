@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { db } from '@/data/db'
@@ -380,6 +380,260 @@ describe('EntryForm：快速輸入', () => {
         expect(screen.getByRole('status')).toHaveTextContent('2026-10-28 沒有餐點紀錄'),
       )
       expect(foodsIn('早餐')).toEqual([])
+    })
+  })
+})
+
+describe('EntryForm：食物拖曳換餐與排序', () => {
+  const foodsIn = (meal: string) =>
+    within(screen.getByRole('group', { name: meal }))
+      .queryAllByRole('button', { name: /^移除 / })
+      .map((b) => b.getAttribute('aria-label')!.replace('移除 ', ''))
+  const handle = (name: string) => screen.getByRole('button', { name: `拖曳 ${name}` })
+  const meal = (name: string) => screen.getByRole('group', { name })
+
+  /** 早餐：燕麥、香蕉、豆漿；午餐：便當 */
+  async function fillMeals() {
+    const user = userEvent.setup()
+    renderForm()
+    for (const [mealName, food] of [
+      ['早餐', '燕麥'],
+      ['早餐', '香蕉'],
+      ['早餐', '豆漿'],
+      ['午餐', '便當'],
+    ]) {
+      await user.type(screen.getByLabelText(`新增食物：${mealName}`), `${food}{Enter}`)
+    }
+    return user
+  }
+
+  describe('鍵盤上下鍵', () => {
+    it('餐內往下、往上各移一格，焦點跟著那一項，並說明結果', async () => {
+      const user = await fillMeals()
+      handle('燕麥').focus()
+
+      await user.keyboard('{ArrowDown}')
+      expect(foodsIn('早餐')).toEqual(['香蕉', '燕麥', '豆漿'])
+      expect(handle('燕麥')).toHaveFocus()
+      expect(screen.getByRole('status')).toHaveTextContent('已調整「燕麥」在早餐的順序')
+
+      await user.keyboard('{ArrowDown}')
+      expect(foodsIn('早餐')).toEqual(['香蕉', '豆漿', '燕麥'])
+      expect(handle('燕麥')).toHaveFocus()
+
+      await user.keyboard('{ArrowUp}')
+      expect(foodsIn('早餐')).toEqual(['香蕉', '燕麥', '豆漿'])
+    })
+
+    it('排序時份量與單位跟著那一項走', async () => {
+      const user = await fillMeals()
+      await user.clear(screen.getByLabelText('燕麥的數量'))
+      await user.type(screen.getByLabelText('燕麥的數量'), '2')
+      await user.selectOptions(screen.getByLabelText('燕麥的單位'), '碗')
+
+      handle('燕麥').focus()
+      await user.keyboard('{ArrowDown}')
+
+      expect(screen.getByLabelText('燕麥的數量')).toHaveValue(2)
+      expect(screen.getByLabelText('燕麥的單位')).toHaveValue('碗')
+      expect(screen.getByLabelText('香蕉的數量')).toHaveValue(1)
+    })
+
+    it('最後一項再往下：移到後一餐的最前面；第一項再往上：移到前一餐的最後面', async () => {
+      const user = await fillMeals()
+      handle('豆漿').focus()
+      await user.keyboard('{ArrowDown}')
+      expect(foodsIn('早餐')).toEqual(['燕麥', '香蕉'])
+      expect(foodsIn('午餐')).toEqual(['豆漿', '便當'])
+      expect(handle('豆漿')).toHaveFocus()
+      expect(screen.getByRole('status')).toHaveTextContent('已把「豆漿」從早餐移到午餐')
+
+      await user.keyboard('{ArrowUp}')
+      expect(foodsIn('早餐')).toEqual(['燕麥', '香蕉', '豆漿'])
+      expect(foodsIn('午餐')).toEqual(['便當'])
+    })
+
+    it('第一餐的第一項往上：沒有地方可去，不動', async () => {
+      const user = await fillMeals()
+      handle('燕麥').focus()
+      await user.keyboard('{ArrowUp}')
+      expect(foodsIn('早餐')).toEqual(['燕麥', '香蕉', '豆漿'])
+    })
+
+    it('要換到的那一餐已有同名食物：不移動並說明原因', async () => {
+      const user = await fillMeals()
+      await user.type(screen.getByLabelText('新增食物：午餐'), '豆漿{Enter}')
+
+      const [fromBreakfast] = screen.getAllByRole('button', { name: '拖曳 豆漿' })
+      fromBreakfast.focus()
+      await user.keyboard('{ArrowDown}')
+
+      expect(foodsIn('早餐')).toEqual(['燕麥', '香蕉', '豆漿'])
+      expect(foodsIn('午餐')).toEqual(['便當', '豆漿'])
+      expect(screen.getByRole('status')).toHaveTextContent('午餐已經有「豆漿」，沒有移動')
+    })
+  })
+
+  describe('用滑鼠或手指拖曳', () => {
+    beforeEach(() => {
+      // jsdom 沒有版面，也沒有這兩個函式：假設每一列高 40、列與列相隔 100（由上到下依序排）；
+      // 點座標的 x 決定「底下」是哪一餐
+      HTMLElement.prototype.setPointerCapture = vi.fn()
+      document.elementFromPoint = vi.fn((x: number) =>
+        meal(x < 100 ? '早餐' : x < 200 ? '午餐' : '晚餐'),
+      )
+      vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+        this: HTMLElement,
+      ) {
+        const rows = [...document.querySelectorAll('[data-food-row]')]
+        const top = rows.indexOf(this) * 100
+        return {
+          top,
+          height: 40,
+          bottom: top + 40,
+          left: 0,
+          right: 0,
+          width: 0,
+          x: 0,
+          y: top,
+          toJSON() {},
+        }
+      })
+    })
+    afterEach(() => vi.restoreAllMocks())
+
+    /** 按住把手、移到 (x, y)，回傳把手，讓測試決定放開或取消 */
+    function dragTo(name: string, x: number, y: number) {
+      const grab = handle(name)
+      fireEvent.pointerDown(grab, { button: 0, pointerId: 1 })
+      fireEvent.pointerMove(grab, { clientX: x, clientY: y, pointerId: 1 })
+      return grab
+    }
+    const drop = (grab: HTMLElement) => fireEvent.pointerUp(grab, { pointerId: 1 })
+    /** 畫了插入線的那一列旁邊的食物名稱（和在它的上面還是下面） */
+    const insertMarks = () =>
+      [...document.querySelectorAll<HTMLElement>('[data-food-row]')]
+        .filter((row) => row.style.boxShadow)
+        .map((row) => ({
+          name: (row.querySelector('input[aria-label$="名稱"]') as HTMLInputElement).value,
+          side: row.style.boxShadow.includes('-3px') ? 'before' : 'after',
+        }))
+
+    it('抓起來時那一列浮起跟著手指走（半透明、原位變淡當佔位），放開後收掉，並輕震一下', async () => {
+      const vibrate = vi.fn()
+      Object.defineProperty(navigator, 'vibrate', { value: vibrate, configurable: true })
+      await fillMeals()
+      const grab = handle('香蕉')
+
+      fireEvent.pointerDown(grab, { button: 0, pointerId: 1, clientX: 10, clientY: 100 })
+      expect(vibrate).toHaveBeenCalledWith(10)
+      const ghost = document.querySelector<HTMLElement>('[data-drag-ghost]')!
+      expect(ghost).toBeInTheDocument()
+      // 浮起的是複製品：看得到內容，但不能操作、讀不到，也不會被當成另一列食物或把手
+      expect(ghost).toHaveAttribute('aria-hidden', 'true')
+      expect([...ghost.querySelectorAll('input')].map((i) => i.value)).toEqual(['香蕉', '1'])
+      expect(document.querySelectorAll('[data-food-row]')).toHaveLength(4)
+      expect(ghost.querySelector('[data-food-handle]')).toBeNull()
+      expect(document.body.style.cursor).toBe('grabbing')
+      // 原本那一列留在原地變淡
+      expect(grab.closest<HTMLElement>('[data-food-row]')!.style.opacity).toBe('0.4')
+
+      fireEvent.pointerMove(grab, { clientX: 150, clientY: 350, pointerId: 1 })
+      expect(ghost.style.transform).toContain('translate(140px, 250px)')
+
+      drop(grab)
+      expect(document.querySelector('[data-drag-ghost]')).toBeNull()
+      expect(document.body.style.cursor).toBe('')
+      delete (navigator as { vibrate?: unknown }).vibrate
+    })
+
+    it('中途取消、或拖到一半整個表單被拿掉：浮起的那一列也收掉', async () => {
+      const { unmount } = render(<EntryForm initial={emptyForm(DATE)} onDateChange={() => {}} />)
+      const user = userEvent.setup()
+      await user.type(screen.getByLabelText('新增食物：早餐'), '燕麥{Enter}')
+      const grab = handle('燕麥')
+      fireEvent.pointerDown(grab, { button: 0, pointerId: 1, clientX: 10, clientY: 100 })
+      expect(document.querySelector('[data-drag-ghost]')).toBeInTheDocument()
+      fireEvent.pointerCancel(grab, { pointerId: 1 })
+      expect(document.querySelector('[data-drag-ghost]')).toBeNull()
+
+      fireEvent.pointerDown(grab, { button: 0, pointerId: 1, clientX: 10, clientY: 100 })
+      unmount()
+      expect(document.querySelector('[data-drag-ghost]')).toBeNull()
+      expect(document.body.style.cursor).toBe('')
+    })
+
+    it('拖到另一餐放開就移過去；拖的過程中那一餐框起來，並在插入的位置畫線', async () => {
+      await fillMeals()
+      // 午餐只有便當（第 4 列，中線 320）：手指在它下半，插在後面
+      const grab = dragTo('香蕉', 150, 350)
+      expect(meal('午餐')).toHaveAttribute('data-drop-target')
+      expect(meal('早餐')).not.toHaveAttribute('data-drop-target')
+      expect(insertMarks()).toEqual([{ name: '便當', side: 'after' }])
+      drop(grab)
+
+      expect(foodsIn('早餐')).toEqual(['燕麥', '豆漿'])
+      expect(foodsIn('午餐')).toEqual(['便當', '香蕉'])
+      expect(meal('午餐')).not.toHaveAttribute('data-drop-target')
+      expect(insertMarks()).toEqual([])
+    })
+
+    it('拖到另一餐某一項的上半，就插在它前面', async () => {
+      await fillMeals()
+      const grab = dragTo('香蕉', 150, 310)
+      expect(insertMarks()).toEqual([{ name: '便當', side: 'before' }])
+      drop(grab)
+      expect(foodsIn('午餐')).toEqual(['香蕉', '便當'])
+    })
+
+    it('同一餐內拖到別的位置就重新排序；只畫插入線，不框起整餐', async () => {
+      await fillMeals()
+      // 早餐三列的中線在 20、120、220：手指在 130（香蕉下半）就插在香蕉後面、豆漿前面
+      const grab = dragTo('燕麥', 50, 130)
+      expect(meal('早餐')).not.toHaveAttribute('data-drop-target')
+      expect(insertMarks()).toEqual([{ name: '豆漿', side: 'before' }])
+      drop(grab)
+      expect(foodsIn('早餐')).toEqual(['香蕉', '燕麥', '豆漿'])
+    })
+
+    it('拖到同一餐的最後面', async () => {
+      await fillMeals()
+      const grab = dragTo('燕麥', 50, 260)
+      expect(insertMarks()).toEqual([{ name: '豆漿', side: 'after' }])
+      drop(grab)
+      expect(foodsIn('早餐')).toEqual(['香蕉', '豆漿', '燕麥'])
+    })
+
+    it('放在自己前面或後面（位置沒變）：不畫線，放開也不動', async () => {
+      await fillMeals()
+      const grab = dragTo('香蕉', 50, 90)
+      expect(insertMarks()).toEqual([])
+      fireEvent.pointerMove(grab, { clientX: 50, clientY: 150, pointerId: 1 })
+      expect(insertMarks()).toEqual([])
+      drop(grab)
+      expect(foodsIn('早餐')).toEqual(['燕麥', '香蕉', '豆漿'])
+      expect(screen.queryByRole('status')).not.toHaveTextContent('順序')
+    })
+
+    it('中途取消：不動，提示也收掉', async () => {
+      await fillMeals()
+      const grab = dragTo('香蕉', 150, 350)
+      fireEvent.pointerCancel(grab, { pointerId: 1 })
+      expect(foodsIn('午餐')).toEqual(['便當'])
+      expect(insertMarks()).toEqual([])
+      expect(meal('午餐')).not.toHaveAttribute('data-drop-target')
+    })
+
+    it('拖到另一餐，但那一餐已有同名食物：不移動並說明原因', async () => {
+      const user = await fillMeals()
+      await user.type(screen.getByLabelText('新增食物：午餐'), '香蕉{Enter}')
+      // 早餐的香蕉（第 2 列）在畫面上排在午餐的便當、香蕉前面
+      const grab = within(meal('早餐')).getByRole('button', { name: '拖曳 香蕉' })
+      fireEvent.pointerDown(grab, { button: 0, pointerId: 1 })
+      fireEvent.pointerMove(grab, { clientX: 150, clientY: 350, pointerId: 1 })
+      drop(grab)
+      expect(foodsIn('早餐')).toEqual(['燕麥', '香蕉', '豆漿'])
+      expect(screen.getByRole('status')).toHaveTextContent('午餐已經有「香蕉」，沒有移動')
     })
   })
 })

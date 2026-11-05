@@ -96,6 +96,82 @@ export function removeFoodItem(meal: MealFormValues, index: number): MealFormVal
   return { ...meal, items: meal.items.filter((_, i) => i !== index) }
 }
 
+/** 食物在三餐中的位置：哪一餐的第幾項（從 0 起算） */
+export interface FoodLocation {
+  meal: MealType
+  index: number
+}
+
+export type MoveFoodResult =
+  | { meals: FormValues['meals']; status: 'moved'; at: FoodLocation }
+  | { meals: FormValues['meals']; status: 'unchanged' | 'duplicate' }
+
+/**
+ * 把一餐裡的某一項食物移到某一餐的某個位置（份量、單位照舊）；同一餐就是重新排序。
+ * `position` 是插在第幾項前面（0 是最前面、清單長度是最後面），以移動前的清單計算，
+ * 不給就接在最後面。位置沒有實際改變時回傳 unchanged；
+ * 移到另一餐時，目標那餐已有同名食物就不移動（duplicate），免得同一餐出現兩筆
+ */
+export function moveFoodItem(
+  meals: FormValues['meals'],
+  from: MealType,
+  index: number,
+  to: MealType,
+  position?: number,
+): MoveFoodResult {
+  const item = meals[from].items[index]
+  if (!item) return { meals, status: 'unchanged' }
+  const clamp = (n: number, length: number) => Math.min(Math.max(n, 0), length)
+
+  if (from === to) {
+    const gap = clamp(position ?? meals[to].items.length, meals[to].items.length)
+    // 拿掉自己之後，排在自己後面的各項都往前移了一格
+    const target = gap > index ? gap - 1 : gap
+    if (target === index) return { meals, status: 'unchanged' }
+    const items = meals[to].items.filter((_, i) => i !== index)
+    items.splice(target, 0, item)
+    return {
+      meals: { ...meals, [to]: { ...meals[to], items } },
+      status: 'moved',
+      at: { meal: to, index: target },
+    }
+  }
+
+  const key = foodKey(item.name)
+  if (meals[to].items.some((i) => foodKey(i.name) === key)) return { meals, status: 'duplicate' }
+  const target = clamp(position ?? meals[to].items.length, meals[to].items.length)
+  const items = [...meals[to].items]
+  items.splice(target, 0, item)
+  return {
+    meals: {
+      ...meals,
+      [from]: removeFoodItem(meals[from], index),
+      [to]: { ...meals[to], items },
+    },
+    status: 'moved',
+    at: { meal: to, index: target },
+  }
+}
+
+/**
+ * 鍵盤上下鍵：把食物在整份餐點裡往上或往下移一格。餐內還有空間就在同一餐內換位置；
+ * 已經在這一餐的第一項（往上）或最後一項（往下），就移到前一餐的最後面或後一餐的最前面
+ */
+export function stepFoodItem(
+  meals: FormValues['meals'],
+  from: MealType,
+  index: number,
+  direction: -1 | 1,
+): MoveFoodResult {
+  const { length } = meals[from].items
+  if (direction < 0 ? index > 0 : index < length - 1) {
+    return moveFoodItem(meals, from, index, from, direction < 0 ? index - 1 : index + 2)
+  }
+  const next = MEAL_TYPES[MEAL_TYPES.indexOf(from) + direction]
+  if (!next) return { meals, status: 'unchanged' }
+  return moveFoodItem(meals, from, index, next, direction < 0 ? undefined : 0)
+}
+
 /**
  * 把一批食物（例如照片辨識的結果）加進一餐：名稱已經在這餐的略過（不蓋掉已經調整過的份量）。
  * 備註接在原本的備註後面，已經包含就不重複。回傳新的餐點與略過了幾項

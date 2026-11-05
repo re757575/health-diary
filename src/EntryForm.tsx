@@ -10,7 +10,7 @@ import {
   Textarea,
   TextInput,
 } from '@mantine/core'
-import { useEffect, useId, useState, type FormEvent } from 'react'
+import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
 import { clearDraft, loadDraft, saveDraft, type Draft } from '@/data/draft'
 import { addFoods, getEntry, saveEntry } from '@/data/repository'
 import {
@@ -33,10 +33,14 @@ import {
   isEmptyMeal,
   formToEntry,
   isSameEntry,
+  moveFoodItem,
+  stepFoodItem,
   shiftDate,
   toTimeString,
   type BowelFormValues,
   type FoodItemFormValues,
+  type FoodLocation,
+  type MoveFoodResult,
   type FormValues,
 } from '@/domain/form'
 import { RatingPicker } from './RatingPicker'
@@ -49,6 +53,7 @@ import { foodsToRemember } from '@/domain/food'
 import type { Medication } from '@/domain/medication'
 import { PRESET_TAGS, addTag, toggleTag } from '@/domain/tag'
 import { ChipChoices } from './ChipChoices'
+import type { DropPosition } from './FoodDragHandle'
 import { MealEditor } from './MealEditor'
 import { PhotoFoodImport } from './PhotoFoodImport'
 import { isSuspectWeight, type DayWeight } from '@/domain/weight'
@@ -103,6 +108,23 @@ export function EntryForm({
   const medicationsLabelId = useId()
   // 正在填的餐別；常吃的食物只列在這一餐下面
   const [activeMeal, setActiveMeal] = useState<MealType | null>(null)
+  // 正在拖曳哪一餐的哪一項食物（over 是手指目前所在的位置）
+  const [drag, setDrag] = useState<{
+    from: MealType
+    index: number
+    over: DropPosition | null
+  } | null>(null)
+  // 用鍵盤移動食物後，要把焦點放到它的新位置（換位置後原本的把手已經是別項的了）
+  const refocus = useRef<FoodLocation | null>(null)
+  useEffect(() => {
+    const at = refocus.current
+    refocus.current = null
+    if (!at) return
+    document
+      .querySelector(`[data-meal-type="${at.meal}"]`)
+      ?.querySelectorAll<HTMLElement>('[data-food-handle]')
+      [at.index]?.focus()
+  })
   // 上次沒儲存就離開（例如切到別的 App 被系統關掉）的內容；和已存的不同才還原。
   // 合併空表單是為了補上舊版草稿沒有的欄位
   const [restored, setRestored] = useState<Draft | undefined>(() => {
@@ -201,6 +223,40 @@ export function EntryForm({
     const { meal, added, skipped } = addFoodItems(form.meals[type], items, note)
     set('meals', { ...form.meals, [type]: meal })
     return { added, skipped }
+  }
+
+  /** 套用食物的移動結果並說明；`to` 是想移到的餐別（移不成時用來說明原因） */
+  function applyFoodMove(from: MealType, index: number, to: MealType, result: MoveFoodResult) {
+    const name = form.meals[from].items[index]?.name
+    if (result.status === 'moved') {
+      set('meals', result.meals)
+      const { meal } = result.at
+      setStatus(
+        meal === from
+          ? `已調整「${name}」在${MEAL_LABELS[meal]}的順序`
+          : `已把「${name}」從${MEAL_LABELS[from]}移到${MEAL_LABELS[meal]}`,
+      )
+    } else if (result.status === 'duplicate') {
+      setStatus(`${MEAL_LABELS[to]}已經有「${name}」，沒有移動`, true)
+    }
+  }
+
+  /** 拖曳放開：移到那一餐的那個位置（同一餐就是重新排序） */
+  function dropFood(from: MealType, index: number, target: DropPosition) {
+    applyFoodMove(
+      from,
+      index,
+      target.meal,
+      moveFoodItem(form.meals, from, index, target.meal, target.position),
+    )
+  }
+
+  /** 鍵盤上下鍵：往上或往下移一格，到頭了就換到前一餐或後一餐 */
+  function stepFood(from: MealType, index: number, direction: -1 | 1) {
+    const result = stepFoodItem(form.meals, from, index, direction)
+    if (result.status === 'moved') refocus.current = result.at
+    const to = MEAL_TYPES[MEAL_TYPES.indexOf(from) + direction] ?? from
+    applyFoodMove(from, index, to, result)
   }
 
   async function handleSubmit(event: FormEvent) {
@@ -417,6 +473,7 @@ export function EntryForm({
         {MEAL_TYPES.map((type) => (
           <MealEditor
             key={type}
+            type={type}
             label={MEAL_LABELS[type]}
             value={form.meals[type]}
             onChange={(meal) => set('meals', { ...form.meals, [type]: meal })}
@@ -424,6 +481,26 @@ export function EntryForm({
             active={activeMeal === type}
             onActivate={() => setActiveMeal(type)}
             notePlaceholder={MEAL_NOTE_PLACEHOLDERS[type]}
+            drag={{
+              draggingIndex: drag?.from === type ? drag.index : null,
+              isDropTarget: drag?.over?.meal === type && drag.from !== type,
+              // 放在自己前面或後面等於沒動，不畫插入線
+              insertAt:
+                drag?.over?.meal === type &&
+                !(
+                  drag.from === type &&
+                  (drag.over.position === drag.index || drag.over.position === drag.index + 1)
+                )
+                  ? drag.over.position
+                  : null,
+              onStart: (index) => setDrag({ from: type, index, over: null }),
+              onOver: (over) => setDrag((d) => (d ? { ...d, over } : d)),
+              onEnd: (index, target) => {
+                setDrag(null)
+                if (target) dropFood(type, index, target)
+              },
+              onStep: (index, direction) => stepFood(type, index, direction),
+            }}
           />
         ))}
 

@@ -1,5 +1,6 @@
 import { Button, Group, Input, Text, TextInput } from '@mantine/core'
 import { useId, useState, type KeyboardEvent } from 'react'
+import type { MealType } from '@/domain/entry'
 import { filterFoods } from '@/domain/food'
 import {
   removeFoodItem,
@@ -7,12 +8,29 @@ import {
   type FoodItemFormValues,
   type MealFormValues,
 } from '@/domain/form'
+import { FoodDragHandle, type DropPosition } from './FoodDragHandle'
 import { FoodItemRow } from './FoodItemRow'
 
 /** 常吃的食物先列這麼多個，其餘收進「更多」，清單再長也只佔幾行 */
 const CHIP_LIMIT = 12
 
+/** 食物拖曳（換餐、重新排序）的事件；沒給就不顯示拖曳把手 */
+export interface FoodDragEvents {
+  /** 正在被拖曳的食物位置；沒有在拖時是 null */
+  draggingIndex: number | null
+  /** 這一餐正是目前拖曳要放進去的另一餐（和拖曳的食物不同餐）：框起來提示 */
+  isDropTarget: boolean
+  /** 放開後會插在這一餐第幾項前面；null 表示這一餐不是目標，或放了位置也不會變 */
+  insertAt: number | null
+  onStart: (index: number) => void
+  onOver: (target: DropPosition | null) => void
+  onEnd: (index: number, target: DropPosition | null) => void
+  onStep: (index: number, direction: -1 | 1) => void
+}
+
 interface Props {
+  /** 餐別；拖曳時用來認出放開的位置是哪一餐 */
+  type: MealType
   label: string
   value: MealFormValues
   onChange: (value: MealFormValues) => void
@@ -22,10 +40,12 @@ interface Props {
   active: boolean
   onActivate: () => void
   notePlaceholder: string
+  drag?: FoodDragEvents
 }
 
 /** 一餐吃的食物：一項一列（名稱、數量、單位，名稱可以改），可以輸入新的或點選常吃的；另有備註 */
 export function MealEditor({
+  type,
   label,
   value,
   onChange,
@@ -33,6 +53,7 @@ export function MealEditor({
   active,
   onActivate,
   notePlaceholder,
+  drag,
 }: Props) {
   const labelId = useId()
   // 新增食物欄位的字，同時用來篩選常吃的食物
@@ -69,7 +90,22 @@ export function MealEditor({
   const shown = expanded ? matches : matches.slice(0, CHIP_LIMIT)
 
   return (
-    <div role="group" aria-labelledby={labelId} onFocusCapture={onActivate}>
+    <div
+      role="group"
+      aria-labelledby={labelId}
+      data-meal-type={type}
+      data-drop-target={drag?.isDropTarget || undefined}
+      onFocusCapture={onActivate}
+      style={
+        drag?.isDropTarget
+          ? {
+              outline: '2px dashed var(--mantine-primary-color-filled)',
+              outlineOffset: 4,
+              borderRadius: 'var(--mantine-radius-sm)',
+            }
+          : undefined
+      }
+    >
       <Input.Label id={labelId} labelElement="div">
         {label}
       </Input.Label>
@@ -83,6 +119,25 @@ export function MealEditor({
           scope={label}
           onChange={(patch) => setItem(i, patch)}
           onRemove={() => onChange(removeFoodItem(value, i))}
+          dragging={drag?.draggingIndex === i}
+          insert={
+            drag?.insertAt === i
+              ? 'before'
+              : drag?.insertAt === value.items.length && i === value.items.length - 1
+                ? 'after'
+                : undefined
+          }
+          leading={
+            drag && (
+              <FoodDragHandle
+                name={item.name}
+                onStart={() => drag.onStart(i)}
+                onOver={drag.onOver}
+                onEnd={(target) => drag.onEnd(i, target)}
+                onStep={(direction) => drag.onStep(i, direction)}
+              />
+            )
+          }
         />
       ))}
 
