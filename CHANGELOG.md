@@ -2,6 +2,11 @@
 
 本檔案由 [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) 依照 [Conventional Commits](https://www.conventionalcommits.org/) 規範的 commit 訊息自動產生，請勿手動編輯內容，執行 `npm run release` 即可更新。
 
+## [0.1.21](https://github.com/re757575/health-diary/compare/v0.1.20...v0.1.21) (2026-11-05)
+
+### Bug Fixes
+
+* **meal:** 食物列在手機上維持單行，只收緊間距 ([6167233](https://github.com/re757575/health-diary/commit/6167233c47e95ee82cb0b937e4f92bf38ca14d11))
 ## [0.1.20](https://github.com/re757575/health-diary/compare/v0.1.19...v0.1.20) (2026-11-05)
 
 ### Features
